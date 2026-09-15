@@ -1,0 +1,37 @@
+from collections.abc import AsyncIterator
+from fastapi.testclient import TestClient
+
+import pytest_asyncio
+from sqlalchemy.ext.asyncio import (
+    AsyncSession,
+    async_sessionmaker,
+    create_async_engine,
+)
+
+from app.database import Base, get_db
+from app.main import app
+
+
+@pytest_asyncio.fixture
+async def client() -> AsyncIterator[AsyncSession]:
+    engine = create_async_engine("sqlite+aiosqlite:///:memory:")
+    async with engine.begin() as session:
+        await session.run_sync(Base.metadata.create_all)
+
+    session_factory = async_sessionmaker(
+        bind=engine,
+        class_=AsyncSession,
+        expire_on_commit=False,
+    )
+    async def override_get_db():
+        async with session_factory() as session:
+            yield session
+
+    app.dependency_overrides[get_db] = override_get_db
+
+    with TestClient(app) as test_client:
+        yield test_client, session_factory
+
+    app.dependency_overrides.clear()
+    await engine.dispose()
+
