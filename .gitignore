@@ -1,0 +1,12 @@
+.env
+.bot.lock
+.venv/
+__pycache__/
+*.py[cod]
+requests.db
+*.sqlite
+*.sqlite3
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.vscode/
