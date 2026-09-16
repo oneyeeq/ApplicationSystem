@@ -144,11 +144,12 @@ def _validate_user_active(user: User) -> None:
     if not user.is_active:
         raise InactiveUserError("Пользователь заблокирован")
 
+def has_reached_active_limit(user: User) -> bool:
+    return user.active_requests >= settings.MAX_ACTIVE_REQUESTS
 
 def _validate_active_request_limit(user: User) -> None:
-    if user.active_requests >= settings.MAX_ACTIVE_REQUESTS:
+    if has_reached_active_limit(user):
         raise ActiveRequestLimitError("Достигнут лимит активных заявок")
-
 
 def _is_status_transition(
     old: StatusEnum,

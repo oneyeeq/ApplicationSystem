@@ -5,7 +5,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.models.user_model import User
 from app.schemas.user_schemas import UserCreate, UserUpdate
 from app.services.exceptions import UserNotFoundError
-from config import settings
+from app.services.request_service import has_reached_active_limit
 
 
 async def get_user_by_telegram_id(db: AsyncSession, telegram_id: int) -> User:
@@ -58,7 +58,7 @@ async def can_create_request(db: AsyncSession, telegram_id: int) -> dict:
     if not user.is_active:
         return {"allowed": False, "error": "inactive"}
 
-    if user.active_requests >= settings.MAX_ACTIVE_REQUESTS:
+    if has_reached_active_limit(user):
         return {"allowed": False, "error": "limit"}
 
     return {"allowed": True, "error": None}
