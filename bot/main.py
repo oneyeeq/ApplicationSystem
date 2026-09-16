@@ -41,7 +41,11 @@ async def main():
     lock_file = acquire_instance_lock()
     timeout = aiohttp.ClientTimeout(total=settings.API_REQUEST_TIMEOUT)
     try:
-        async with aiohttp.ClientSession(timeout=timeout) as session:
+        async with aiohttp.ClientSession(
+            timeout=timeout,
+            headers={"X-Service-Token": settings.SERVICE_TOKEN},
+        ) as session:
+
             api_client = ApiClient(session)
             dp["api_client"] = api_client
             await dp.start_polling(bot)
