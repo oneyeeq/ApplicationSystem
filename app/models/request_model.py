@@ -18,7 +18,11 @@ class Request(Base):
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
     service_name: Mapped[str] = mapped_column(String(255), nullable=False)
     phone_number: Mapped[str] = mapped_column(String(32), nullable=False)
-    user_id: Mapped[int] = mapped_column(ForeignKey("user.id"), nullable=False)
+    user_id: Mapped[int] = mapped_column(
+        ForeignKey("user.id", ondelete="RESTRICT"),
+        nullable=False,
+        index=True,
+    )
     status: Mapped[StatusEnum] = mapped_column(
         SAEnum(StatusEnum, native_enum=False),
         default=StatusEnum.NEW,
