@@ -4,8 +4,10 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 
 from app.schemas.auth_schemas import LoginRequest, LoginResponse
-from app.services.auth_service import authenticate_admin, refresh_access_token
-
+from app.services.auth_service import (authenticate_admin,
+                                       refresh_access_token,
+                                       revoke_refresh_token,
+                                       )
 from app.database import get_db
 from app.services.exceptions import (
     AdminNotFoundError,
@@ -63,3 +65,14 @@ async def auth_refresh(
         raise HTTPException(status_code=401, detail="Неправильный токен")
     except RefreshTokenExpiredError:
         raise HTTPException(status_code=401, detail="Токен истек")
+
+@router.post("/auth/logout/")
+async def auth_logout(
+    response: Response,
+    refresh_token: str | None = Cookie(default=None),
+    db: AsyncSession = Depends(get_db),
+):
+    if refresh_token is not None:
+        await revoke_refresh_token(refresh_token, db)
+    response.delete_cookie("refresh_token")
+    return {"message": "Вы вышли из системы"}

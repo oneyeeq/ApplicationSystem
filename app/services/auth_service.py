@@ -75,3 +75,14 @@ async def refresh_access_token(
     db.add(refresh_token)
     await db.commit()
     return new_access_token, new_raw_refresh_token
+
+async def revoke_refresh_token(
+    raw_refresh_token: str,
+    db: AsyncSession,
+) -> None:
+    token_hash = hash_refresh_token(raw_refresh_token)
+    result = await db.execute(select(RefreshToken).where(RefreshToken.token_hash == token_hash))
+    stored_token = result.scalar_one_or_none()
+    if stored_token is not None:
+        stored_token.revoked_at = datetime.now(timezone.utc)
+        await db.commit()
