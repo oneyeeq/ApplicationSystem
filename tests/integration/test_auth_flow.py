@@ -1,5 +1,8 @@
 from datetime import datetime, timedelta, timezone
 
+from jose import jwt
+
+from config import settings
 from app.models.refresh_token_model import RefreshToken
 from app.security import generate_refresh_token, hash_refresh_token
 from app.schemas.admin_schemas import AdminCreate
@@ -120,6 +123,29 @@ async def test_create_admin_with_tampered_token(client):
         "/admins/",
         json={"login": "admin1", "password": "password123"},
         headers={"Authorization": f"Bearer {token}"},
+    )
+    assert response.status_code == 401
+
+async def test_create_admin_with_expired_token(client):
+    test_client, session_factory = client
+    async with session_factory() as session:
+        await admin_service.create_admin(
+            AdminCreate(login="admin",
+                        password="password123",
+                        tg_admin_id=None,
+                        username=None
+            ),
+            session,
+        )
+    expired_token = jwt.encode(
+        {"sub": "admin", "exp": 0},
+        settings.JWT_SECRET_KEY,
+        algorithm=settings.JWT_ALGORITHM,
+    )
+    response = test_client.post(
+        "/admins/",
+        json={"login": "admin1", "password": "password123", "tg_admin_id": None, "username": None},
+        headers={"Authorization": f"Bearer {expired_token}"},
     )
     assert response.status_code == 401
 
