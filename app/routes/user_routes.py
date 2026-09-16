@@ -8,8 +8,9 @@ from app.database import get_db
 from app.schemas.user_schemas import UserCreate, UserResponse, UserUpdate
 from app.services import user_service
 from app.services.exceptions import UserNotFoundError
+from app.dependencies.service_auth import verify_service_token
 
-router = APIRouter()
+router = APIRouter(dependencies=[Depends(verify_service_token)])
 DbSession = Annotated[AsyncSession, Depends(get_db)]
 
 @router.get("/users/by-telegram/{telegram_id}", response_model=UserResponse)

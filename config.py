@@ -32,6 +32,7 @@ class Settings(BaseSettings):
     JWT_ALGORITHM: str = "HS256"
     JWT_EXPIRE_MINUTES: int = 30
     REFRESH_TOKEN_EXPIRE_DAYS: int = 30
+    SERVICE_TOKEN: str
 
     model_config = SettingsConfigDict(
         env_file=".env",

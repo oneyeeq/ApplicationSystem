@@ -11,11 +11,15 @@ from app.models.admin_model import Admin
 from app.services.exceptions import AdminAlreadyExistsError, AdminNotFoundError
 from app.services import admin_service
 from app.dependencies.auth import get_current_admin
+from app.dependencies.service_auth import verify_service_token
 
 router = APIRouter()
 
 @router.get("/admins/active", response_model=list[AdminNotificationResponse])
-async def get_active_admins(db: AsyncSession = Depends(get_db)):
+async def get_active_admins(
+    db: AsyncSession = Depends(get_db),
+    _: None = Depends(verify_service_token)
+    ):
     try:
         return await admin_service.get_active_admins(db)
     except AdminNotFoundError:

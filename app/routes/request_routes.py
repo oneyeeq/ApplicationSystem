@@ -4,6 +4,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.database import get_db
 from app.schemas.request_schemas import RequestCreate, RequestResponse, RequestUpdate
 from app.services import request_service
+from app.dependencies.service_auth import verify_service_token
 from app.services.notification_service import (
     notify_admins_about_request,
     notify_user_about_status,
@@ -17,7 +18,7 @@ from app.services.exceptions import (
     RequestTransitionNotAllowedError,
 )
 
-router = APIRouter()
+router = APIRouter(dependencies=[Depends(verify_service_token)])
 
 
 @router.post("/requests/{telegram_id}", response_model=RequestResponse)
