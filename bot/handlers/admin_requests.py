@@ -4,6 +4,7 @@ from aiogram import F, Router
 from aiogram.filters import Command
 from aiogram.types import CallbackQuery, Message
 
+from enums import StatusEnum
 from bot.clients.api_client import ApiClient
 from bot.dtos import RequestData
 import bot.keyboards.admin_keyboards as kb
@@ -345,9 +346,9 @@ async def handle_view_request(callback: CallbackQuery, api_client: ApiClient):
         return
 
     reply_markup = None
-    if request_data.status == "новая":
+    if request_data.status == StatusEnum.NEW.value:
         reply_markup = kb.admin_notification_request_keyboard(request_id)
-    elif request_data.status == "в_процессе":
+    elif request_data.status == StatusEnum.IN_PROGRESS.value:
         reply_markup = kb.admin_in_progress_request_keyboard(request_id)
 
     await callback.answer()
@@ -364,7 +365,7 @@ async def handle_next_new_request(callback: CallbackQuery, api_client: ApiClient
         callback.from_user.id,
         request_id,
         direction=1,
-        status_to_find="новая",
+        status_to_find=StatusEnum.NEW.value,
     )
     if not is_success:
         await callback.answer(error_text, show_alert=True)
@@ -427,7 +428,7 @@ async def handle_next_in_progress_request(callback: CallbackQuery, api_client: A
         callback.from_user.id,
         request_id,
         direction=1,
-        status_to_find="в_процессе",
+        status_to_find=StatusEnum.IN_PROGRESS.value,
     )
     if not is_success:
         await callback.answer(error_text, show_alert=True)
@@ -449,7 +450,7 @@ async def handle_previous_in_progress_request(callback: CallbackQuery, api_clien
         callback.from_user.id,
         request_id,
         direction=-1,
-        status_to_find="в_процессе",
+        status_to_find=StatusEnum.IN_PROGRESS.value,
     )
     if not is_success:
         await callback.answer(error_text, show_alert=True)
@@ -471,7 +472,7 @@ async def handle_previous_new_request(callback: CallbackQuery, api_client: ApiCl
         callback.from_user.id,
         request_id,
         direction=-1,
-        status_to_find="новая",
+        status_to_find=StatusEnum.NEW.value,
     )
     if not is_success:
         await callback.answer(error_text, show_alert=True)
@@ -487,19 +488,19 @@ async def handle_previous_new_request(callback: CallbackQuery, api_client: ApiCl
 
 @router.callback_query(F.data.startswith("take_request:"))
 async def handle_take_request(callback: CallbackQuery, api_client: ApiClient):
-    await update_new_request_status_from_callback(callback, api_client, "в_процессе")
+    await update_new_request_status_from_callback(callback, api_client, StatusEnum.IN_PROGRESS.value)
 
 @router.callback_query(F.data.startswith("complete_request:"))
 async def handle_complete_request(callback: CallbackQuery, api_client: ApiClient):
-    await update_in_progress_request_status_from_callback(callback, api_client, "завершена")
+    await update_in_progress_request_status_from_callback(callback, api_client, StatusEnum.COMPLETED.value)
 
 @router.callback_query(F.data.startswith("reject_in_progress_request:"))
 async def handle_reject_in_progress_request(callback: CallbackQuery, api_client: ApiClient):
-    await update_in_progress_request_status_from_callback(callback, api_client, "отклонена")
+    await update_in_progress_request_status_from_callback(callback, api_client, StatusEnum.REJECTED.value)
 
 @router.callback_query(F.data.startswith("reject_new_request:"))
 async def handle_reject_new_request(callback: CallbackQuery, api_client: ApiClient):
-    await update_new_request_status_from_callback(callback, api_client, "отклонена")
+    await update_new_request_status_from_callback(callback, api_client, StatusEnum.REJECTED.value)
 
 
 @router.callback_query(F.data.startswith("take_notification_request:"))
@@ -507,7 +508,7 @@ async def handle_take_notification_request(callback: CallbackQuery, api_client: 
     await update_notification_request_status_from_callback(
         callback,
         api_client,
-        "в_процессе",
+        StatusEnum.IN_PROGRESS.value,
     )
 
 
@@ -516,7 +517,7 @@ async def handle_reject_notification_request(callback: CallbackQuery, api_client
     await update_notification_request_status_from_callback(
         callback,
         api_client,
-        "отклонена",
+        StatusEnum.REJECTED.value,
     )
 
 
@@ -525,7 +526,7 @@ async def handle_take_today_request(callback: CallbackQuery, api_client: ApiClie
     await update_today_request_status_from_callback(
         callback,
         api_client,
-        "в_процессе",
+        StatusEnum.IN_PROGRESS.value,
     )
 
 
@@ -534,7 +535,7 @@ async def handle_reject_today_request(callback: CallbackQuery, api_client: ApiCl
     await update_today_request_status_from_callback(
         callback,
         api_client,
-        "отклонена",
+        StatusEnum.REJECTED.value,
     )
 
 
@@ -543,7 +544,7 @@ async def handle_complete_today_request(callback: CallbackQuery, api_client: Api
     await update_today_request_status_from_callback(
         callback,
         api_client,
-        "завершена",
+        StatusEnum.COMPLETED.value,
     )
 
 
@@ -555,5 +556,5 @@ async def handle_reject_today_in_progress_request(
     await update_today_request_status_from_callback(
         callback,
         api_client,
-        "отклонена",
+        StatusEnum.REJECTED.value,
     )

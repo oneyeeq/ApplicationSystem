@@ -9,10 +9,14 @@ from bot.clients.api_client import ApiClient
 from bot.handlers.admin_handler import router as admin_router
 from bot.handlers.request_handler import router as request_router
 from bot.handlers.start_handler import router as start_router
+from bot.middlewares.admin_auth import AdminAuthMiddleware
 from config import settings
 
 bot = Bot(token=settings.BOT_TOKEN)
 dp = Dispatcher()
+
+admin_router.message.middleware(AdminAuthMiddleware())
+admin_router.callback_query.middleware(AdminAuthMiddleware())
 
 dp.include_router(start_router)
 dp.include_router(request_router)

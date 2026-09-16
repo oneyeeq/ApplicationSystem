@@ -1,5 +1,6 @@
 from aiogram.types import InlineKeyboardMarkup
 
+from enums import StatusEnum
 import bot.keyboards.admin_keyboards as keyboards
 from bot.dtos import RequestData
 
@@ -19,11 +20,11 @@ def get_today_request_keyboard(
     request_id = request_data.id
     status = request_data.status
 
-    if status == "новая":
+    if status == StatusEnum.NEW.value:
         return keyboards.admin_today_new_request_keyboard(request_id)
-    if status == "в_процессе":
+    if status == StatusEnum.IN_PROGRESS.value:
         return keyboards.admin_today_in_progress_request_keyboard(request_id)
-    if status in {"завершена", "отклонена"}:
+    if status in {StatusEnum.COMPLETED.value, StatusEnum.REJECTED.value}:
         return keyboards.admin_today_closed_request_keyboard(request_id)
 
     return None

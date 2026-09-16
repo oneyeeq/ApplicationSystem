@@ -5,6 +5,7 @@ from datetime import timezone as datetime_timezone
 
 from collections.abc import Awaitable, Callable
 
+from enums import StatusEnum
 from bot.clients.api_client import ApiClient
 from bot.dtos import AdminData, RequestData
 
@@ -30,9 +31,6 @@ async def get_today_requests(
         api_client: ApiClient,
         telegram_id: int
 ) -> tuple[bool, str | None, list[RequestData]]:
-    is_admin, error_text = await is_active_admin(api_client, telegram_id)
-    if not is_admin:
-        return False, error_text, []
     requests, status = await api_client.get_requests()
     if status != "ok":
         return False, "Сервис временно недоступен", []
@@ -79,10 +77,6 @@ async def get_request_for_admin(
     telegram_id: int,
     request_id: int,
 ) -> tuple[bool, str | None, RequestData | None]:
-    is_admin, error_text = await is_active_admin(api_client, telegram_id)
-    if not is_admin:
-        return False, error_text, None
-
     request_data, status = await api_client.get_request(request_id)
     if status == "not_found":
         return False, "Заявка не найдена", None
@@ -97,19 +91,15 @@ async def update_request_status(
     request_id: int,
     new_status: str,
 ) -> tuple[bool, str | None, RequestData | None]:
-    is_admin, error_text = await is_active_admin(api_client, telegram_id)
-    if not is_admin:
-        return False, error_text, None
-
     request_data, status = await api_client.update_request_status(
         request_id,
         new_status,
     )
     if status == "ok":
         status_messages = {
-            "в_процессе": "Заявка принята",
-            "завершена": "Заявка завершена",
-            "отклонена": "Заявка отклонена",
+            StatusEnum.IN_PROGRESS.value: "Заявка принята",
+            StatusEnum.COMPLETED.value: "Заявка завершена",
+            StatusEnum.REJECTED.value: "Заявка отклонена",
         }
         message = status_messages.get(new_status, "Статус заявки изменён")
         return True, message, request_data
@@ -125,10 +115,6 @@ async def get_requests_by_status(
     telegram_id: int,
     status_to_find: str,
 ) -> tuple[bool, str | None, list[RequestData]]:
-    is_admin, error_text = await is_active_admin(api_client, telegram_id)
-    if not is_admin:
-        return False, error_text, []
-
     requests, status = await api_client.get_requests()
     if status != "ok":
         return False, "Сервис временно недоступен", []
@@ -145,13 +131,13 @@ async def get_new_requests(
     api_client: ApiClient,
     telegram_id: int,
 ) -> tuple[bool, str | None, list[RequestData]]:
-    return await get_requests_by_status(api_client, telegram_id, "новая")
+    return await get_requests_by_status(api_client, telegram_id, StatusEnum.NEW.value)
 
 async def get_in_progress_requests(
     api_client: ApiClient,
     telegram_id: int,
 ) -> tuple[bool, str | None, list[RequestData]]:
-    return await get_requests_by_status(api_client, telegram_id, "в_процессе")
+    return await get_requests_by_status(api_client, telegram_id, StatusEnum.IN_PROGRESS.value)
 
 
 async def _get_first_request(
