@@ -51,7 +51,10 @@ async def refresh_access_token(
     stored_token = result.scalar_one_or_none()
     if not stored_token:
         raise RefreshTokenInvalidError("Токен не найден")
-    if stored_token.expires_at < datetime.now(timezone.utc):
+    expires_at = stored_token.expires_at
+    if expires_at.tzinfo is None:
+        expires_at = expires_at.replace(tzinfo=timezone.utc)
+    if expires_at < datetime.now(timezone.utc):
         raise RefreshTokenExpiredError("Токен истёк")
     if stored_token.revoked_at is not None:
         await db.execute(

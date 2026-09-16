@@ -1,16 +1,18 @@
-from fastapi import Response
+from fastapi import Response, Cookie
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 
 
 from app.schemas.auth_schemas import LoginRequest, LoginResponse
-from app.services.auth_service import authenticate_admin
+from app.services.auth_service import authenticate_admin, refresh_access_token
 
 from app.database import get_db
 from app.services.exceptions import (
     AdminNotFoundError,
     AdminIsNotActiveError,
     PasswordNotValidError,
+    RefreshTokenInvalidError,
+    RefreshTokenExpiredError,
 )
 
 router = APIRouter()
@@ -39,3 +41,25 @@ async def auth_login(
         raise HTTPException(status_code=401, detail="Неверный логин или пароль")
     except PasswordNotValidError:
         raise HTTPException(status_code=401, detail="Неверный логин или пароль")
+
+@router.post("/auth/refresh/", response_model=LoginResponse)
+async def auth_refresh(
+    response: Response,
+    refresh_token: str | None = Cookie(default=None),
+    db: AsyncSession = Depends(get_db),
+):
+    if refresh_token is None:
+        raise HTTPException(status_code=401, detail="Токен отсутствует")
+    try:
+        new_access_token, new_raw_refresh_token = await refresh_access_token(refresh_token, db)
+        response.set_cookie(
+            key="refresh_token",
+            value=new_raw_refresh_token,
+            httponly=True,
+            samesite="lax",
+        )
+        return LoginResponse(access_token=new_access_token, token_type="bearer")
+    except RefreshTokenInvalidError:
+        raise HTTPException(status_code=401, detail="Неправильный токен")
+    except RefreshTokenExpiredError:
+        raise HTTPException(status_code=401, detail="Токен истек")
