@@ -1,8 +1,11 @@
+from collections.abc import Awaitable, Callable
+
 from aiogram import F, Router
 from aiogram.filters import Command
 from aiogram.types import CallbackQuery, Message
 
 from bot.clients.api_client import ApiClient
+from bot.dtos import RequestData
 import bot.keyboards.admin_keyboards as kb
 import bot.services.admin_service as admin_service
 from bot.handlers.admin_navigation import (
@@ -15,6 +18,11 @@ from bot.handlers.admin_presenter import (
 )
 
 router = Router()
+
+RenderAfterUpdate = Callable[
+    [CallbackQuery, ApiClient, RequestData | None],
+    Awaitable[None],
+]
 
 
 async def _send_first_admin_request(
@@ -92,76 +100,12 @@ async def _edit_to_first_in_progress_request(
     return True
 
 
-async def update_new_request_status_from_callback(
+async def _update_request_status_from_callback(
     callback: CallbackQuery,
     api_client: ApiClient,
     new_status: str,
-):
-    request_id = int(callback.data.split(":", maxsplit=1)[1])
-    is_success, status_text, _ = await admin_service.update_request_status(
-        api_client,
-        callback.from_user.id,
-        request_id,
-        new_status,
-    )
-
-    if not is_success:
-        await callback.answer(status_text, show_alert=True)
-        return
-
-    await callback.answer(status_text)
-    await _edit_to_first_new_request(callback, api_client)
-
-async def update_in_progress_request_status_from_callback(
-    callback: CallbackQuery,
-    api_client: ApiClient,
-    new_status: str,
-):
-    request_id = int(callback.data.split(":", maxsplit=1)[1])
-    is_success, status_text, _ = await admin_service.update_request_status(
-        api_client,
-        callback.from_user.id,
-        request_id,
-        new_status,
-    )
-
-    if not is_success:
-        await callback.answer(status_text, show_alert=True)
-        return
-
-    await callback.answer(status_text)
-    await _edit_to_first_in_progress_request(callback, api_client)
-
-
-async def update_notification_request_status_from_callback(
-    callback: CallbackQuery,
-    api_client: ApiClient,
-    new_status: str,
-):
-    request_id = int(callback.data.split(":", maxsplit=1)[1])
-    is_success, status_text, _ = await admin_service.update_request_status(
-        api_client,
-        callback.from_user.id,
-        request_id,
-        new_status,
-    )
-
-    if not is_success:
-        await callback.answer(status_text, show_alert=True)
-        return
-
-    await callback.answer(status_text)
-    await callback.message.edit_text(
-        "Выберите действие:",
-        reply_markup=kb.admin_menu_keyboard(),
-    )
-
-
-async def update_today_request_status_from_callback(
-    callback: CallbackQuery,
-    api_client: ApiClient,
-    new_status: str,
-):
+    render_after: RenderAfterUpdate,
+) -> None:
     request_id = int(callback.data.split(":", maxsplit=1)[1])
     is_success, status_text, request_data = await admin_service.update_request_status(
         api_client,
@@ -175,9 +119,84 @@ async def update_today_request_status_from_callback(
         return
 
     await callback.answer(status_text)
+    await render_after(callback, api_client, request_data)
+
+
+async def _render_first_new_request(
+    callback: CallbackQuery,
+    api_client: ApiClient,
+    request_data: RequestData | None,
+) -> None:
+    await _edit_to_first_new_request(callback, api_client)
+
+
+async def _render_first_in_progress_request(
+    callback: CallbackQuery,
+    api_client: ApiClient,
+    request_data: RequestData | None,
+) -> None:
+    await _edit_to_first_in_progress_request(callback, api_client)
+
+
+async def _render_admin_menu(
+    callback: CallbackQuery,
+    api_client: ApiClient,
+    request_data: RequestData | None,
+) -> None:
+    await callback.message.edit_text(
+        "Выберите действие:",
+        reply_markup=kb.admin_menu_keyboard(),
+    )
+
+
+async def _render_today_request(
+    callback: CallbackQuery,
+    api_client: ApiClient,
+    request_data: RequestData | None,
+) -> None:
     await callback.message.edit_text(
         format_request_text(request_data),
         reply_markup=get_today_request_keyboard(request_data),
+    )
+
+
+async def update_new_request_status_from_callback(
+    callback: CallbackQuery,
+    api_client: ApiClient,
+    new_status: str,
+) -> None:
+    await _update_request_status_from_callback(
+        callback, api_client, new_status, _render_first_new_request
+    )
+
+
+async def update_in_progress_request_status_from_callback(
+    callback: CallbackQuery,
+    api_client: ApiClient,
+    new_status: str,
+) -> None:
+    await _update_request_status_from_callback(
+        callback, api_client, new_status, _render_first_in_progress_request
+    )
+
+
+async def update_notification_request_status_from_callback(
+    callback: CallbackQuery,
+    api_client: ApiClient,
+    new_status: str,
+) -> None:
+    await _update_request_status_from_callback(
+        callback, api_client, new_status, _render_admin_menu
+    )
+
+
+async def update_today_request_status_from_callback(
+    callback: CallbackQuery,
+    api_client: ApiClient,
+    new_status: str,
+) -> None:
+    await _update_request_status_from_callback(
+        callback, api_client, new_status, _render_today_request
     )
 
 @router.callback_query(F.data == "admin_back_to_menu")
