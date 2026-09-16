@@ -4,8 +4,8 @@ from pydantic import BaseModel, ConfigDict, Field
 class AdminCreate(BaseModel):
     login: str = Field(min_length=3, max_length=50)
     password: str = Field(min_length=8, max_length=128)
-    tg_admin_id: int | None
-    username: str | None
+    tg_admin_id: int | None = None
+    username: str | None = None
    
 
 
