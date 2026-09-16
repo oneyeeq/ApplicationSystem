@@ -2,10 +2,16 @@ from fastapi import Response
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 
+
 from app.schemas.auth_schemas import LoginRequest, LoginResponse
 from app.services.auth_service import authenticate_admin
+
 from app.database import get_db
-from app.services.exceptions import AdminNotFoundError, AdminIsNotActiveError, PasswordNotValidError
+from app.services.exceptions import (
+    AdminNotFoundError,
+    AdminIsNotActiveError,
+    PasswordNotValidError,
+)
 
 router = APIRouter()
 
