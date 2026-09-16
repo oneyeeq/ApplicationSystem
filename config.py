@@ -34,6 +34,8 @@ class Settings(BaseSettings):
     REFRESH_TOKEN_EXPIRE_DAYS: int = 30
     SERVICE_TOKEN: str
 
+    CORS_ALLOWED_ORIGINS: list[str] = ["http://localhost:5173"]
+
     model_config = SettingsConfigDict(
         env_file=".env",
         env_file_encoding="utf-8",
