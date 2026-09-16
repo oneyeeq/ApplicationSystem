@@ -1,3 +1,4 @@
+from fastapi import Response
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -9,13 +10,23 @@ from app.services.exceptions import AdminNotFoundError, AdminIsNotActiveError, P
 router = APIRouter()
 
 @router.post("/auth/login/", response_model=LoginResponse)
-async def auth_login(request_data: LoginRequest, db: AsyncSession = Depends(get_db)):
+async def auth_login(
+    request_data: LoginRequest,
+    response: Response,
+    db: AsyncSession = Depends(get_db),
+):
     try:
-        response = await authenticate_admin(
+        login_response, raw_refresh_token = await authenticate_admin(
             request_data,
-            db,
+            db
         )
-        return response
+        response.set_cookie(
+            key="refresh_token",
+            value=raw_refresh_token,
+            httponly=True,
+            samesite="lax",
+        )
+        return login_response
     except AdminNotFoundError:
         raise HTTPException(status_code=401, detail="Неверный логин или пароль")
     except AdminIsNotActiveError:

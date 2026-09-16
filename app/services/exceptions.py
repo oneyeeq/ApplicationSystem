@@ -30,3 +30,9 @@ class AdminIsNotActiveError(Exception):
 
 class PasswordNotValidError(Exception):
     pass
+
+class RefreshTokenInvalidError(Exception):
+    pass
+
+class RefreshTokenExpiredError(Exception):
+    pass

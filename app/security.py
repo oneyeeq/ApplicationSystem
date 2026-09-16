@@ -70,3 +70,9 @@ def decode_access_token(token: str) -> str:
         raise ValueError("Токен не содержит субъект")
 
     return subject
+
+def generate_refresh_token() -> str:
+    return secrets.token_urlsafe(32)
+
+def hash_refresh_token(raw_token: str) -> str:
+    return hashlib.sha256(raw_token.encode()).hexdigest()
