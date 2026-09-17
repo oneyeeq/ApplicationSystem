@@ -1,205 +1,207 @@
+*[English version](README.en.md)*
+
 # Request Service
 
-A production-style service-request platform: a Telegram bot for customers and admins, a FastAPI backend, and a scheduler for housekeeping — all running behind a real authentication layer, not a demo stub.
+Платформа для приёма и обработки заявок на услуги: Telegram-бот для клиентов и администраторов, backend на FastAPI и планировщик для фоновой очистки — всё за настоящим слоем авторизации, а не демонстрационной заглушкой.
 
-Customers submit service requests through a Telegram bot. Admins review, accept, complete, or reject them — either through the same bot or (soon) a web admin panel. The backend is the single source of truth for both.
+Клиенты оставляют заявки через Telegram-бота. Администраторы просматривают их, принимают в работу, завершают или отклоняют — либо через тот же бот, либо (в перспективе) через веб-панель. Backend — единый источник истины для обоих клиентов.
 
-Built as a portfolio project, but engineered like it has to survive contact with real users: JWT access/refresh tokens with rotation and theft detection, a separate service-to-service auth model for the bot, async SQLAlchemy + Alembic migrations, a layered bot architecture, and a test suite that includes real HTTP-level integration tests, not just mocked unit tests.
+Сделано как портфолио-проект, но спроектировано так, будто ему предстоит выдержать реальную нагрузку: JWT access/refresh-токены с ротацией и детектом кражи, отдельная модель service-to-service авторизации для бота, асинхронный SQLAlchemy + миграции Alembic, слоистая архитектура бота и тесты, включающие настоящие HTTP-интеграционные проверки, а не только моки.
 
-## Contents
+## Содержание
 
-- [Architecture](#architecture)
-- [Key engineering decisions](#key-engineering-decisions)
-- [Tech stack](#tech-stack)
-- [Project structure](#project-structure)
-- [Quickstart](#quickstart)
-- [Configuration](#configuration)
+- [Архитектура](#архитектура)
+- [Ключевые инженерные решения](#ключевые-инженерные-решения)
+- [Стек технологий](#стек-технологий)
+- [Структура проекта](#структура-проекта)
+- [Быстрый старт](#быстрый-старт)
+- [Конфигурация](#конфигурация)
 - [API](#api)
-- [Testing](#testing)
-- [Extending & scaling](#extending--scaling)
+- [Тестирование](#тестирование)
+- [Расширение и масштабирование](#расширение-и-масштабирование)
 - [Roadmap](#roadmap)
-- [License](#license)
+- [Лицензия](#лицензия)
 
-## Architecture
+## Архитектура
 
 ```
                     ┌─────────────┐
-   Telegram user ───▶  aiogram    │
-                    │    bot      │──┐
+ Пользователь ──────▶  Telegram-  │
+   Telegram         │    бот      │──┐
                     └─────────────┘  │
                                       │  HTTP + X-Service-Token
-                    ┌─────────────┐  │  (service-to-service auth)
-  Browser / React ──▶  FastAPI    │◀─┘
-   admin panel     │    API      │
+                    ┌─────────────┐  │  (service-to-service авторизация)
+ Браузер / React ───▶  FastAPI    │◀─┘
+   админ-панель     │    API      │
                     └──────┬──────┘
                            │
                     ┌──────▼──────┐      ┌──────────────┐
-                    │  PostgreSQL │◀─────│  Scheduler   │
-                    │             │      │ (cleanup job)│
+                    │  PostgreSQL │◀─────│  Планировщик │
+                    │             │      │  (очистка)   │
                     └─────────────┘      └──────────────┘
 ```
 
-Four independent processes, one database, no shared in-memory state — any of them can be restarted, scaled, or redeployed without touching the others:
+Четыре независимых процесса, одна база данных, никакого общего состояния в памяти — любой из них можно перезапустить, отмасштабировать или передеплоить, не трогая остальные:
 
-- **`app/`** — FastAPI backend. Owns all business logic and all writes to the database. Routes are intentionally thin (HTTP mapping + exception-to-status-code translation only); everything else lives in `services/`.
-- **`bot/`** — aiogram 3 Telegram bot. Talks to the backend exclusively over HTTP, through a typed client (`bot/clients/api_client.py`) — it has no direct database access and no SQLAlchemy dependency.
-- **`scheduler/`** — a standalone async loop that periodically deletes closed requests past their retention window. Talks to the database directly (no need to go through the API for a housekeeping job with no external caller).
-- **`migrations/`** — Alembic migration history, one revision per schema change, all verified reversible.
+- **`app/`** — backend на FastAPI. Владеет всей бизнес-логикой и всеми записями в базу. Роуты намеренно тонкие (только HTTP-маппинг и перевод исключений в статус-коды); вся остальная логика — в `services/`.
+- **`bot/`** — Telegram-бот на aiogram 3. Общается с backend'ом исключительно по HTTP через типизированный клиент (`bot/clients/api_client.py`) — у него нет ни прямого доступа к БД, ни зависимости от SQLAlchemy.
+- **`scheduler/`** — отдельный асинхронный цикл, который периодически удаляет закрытые заявки старше срока хранения. Ходит в базу напрямую — для фоновой задачи без внешних вызывающих нет смысла делать это через API.
+- **`migrations/`** — история миграций Alembic, по одной ревизии на изменение схемы, все проверены на обратимость.
 
-## Key engineering decisions
+## Ключевые инженерные решения
 
-These are the parts worth a second look if you're evaluating the code, not just skimming the folder names.
+То, на что стоит обратить внимание, если оцениваешь код, а не просто просматриваешь названия папок.
 
-**Two separate auth models, not one stretched to fit.** A human admin logging into the (future) web panel gets a JWT access token plus a refresh token — because that's a session that needs to survive browser restarts and be revocable. The bot is a trusted service, not a person with a password, so it authenticates with a static shared secret (`X-Service-Token`, checked via `hmac.compare_digest` for timing-attack resistance) instead of pretending it's a user. See `app/dependencies/auth.py` vs `app/dependencies/service_auth.py`.
+**Две разные модели авторизации, а не одна натянутая на всё.** Человек-администратор, логинящийся в (будущую) веб-панель, получает JWT access-токен и refresh-токен — потому что это сессия, которая должна пережить перезапуск браузера и быть отзываемой. Бот — доверенный сервис, а не человек с паролем, поэтому он авторизуется общим секретом (`X-Service-Token`, сверяется через `hmac.compare_digest` — устойчиво к timing-атакам), а не притворяется пользователем. Смотри `app/dependencies/auth.py` против `app/dependencies/service_auth.py`.
 
-**Refresh tokens are opaque and hashed at rest, with rotation and reuse detection.** The token stored in the database is a SHA-256 hash of a random 256-bit value — never the token itself, so a database leak alone doesn't leak live sessions. Every refresh both invalidates the old token and issues a new one; if an already-used (and therefore already-revoked) token is presented again, that's treated as a signal of theft and *every* refresh token for that admin is revoked at once. See `app/services/auth_service.py::refresh_access_token`.
+**Refresh-токены непрозрачны и хранятся хешированными, с ротацией и детектом повторного использования.** В базе хранится не сам токен, а SHA-256-хеш случайного 256-битного значения — утечка базы сама по себе не раскрывает живые сессии. Каждое обновление одновременно инвалидирует старый токен и выдаёт новый; если уже использованный (а значит уже отозванный) токен предъявляется повторно — это трактуется как сигнал кражи, и **все** refresh-токены этого админа отзываются разом. Смотри `app/services/auth_service.py::refresh_access_token`.
 
-**Passwords use `scrypt`, refresh tokens use `sha256` — deliberately different.** A password is short and human-chosen, so it needs a slow, memory-hard hash to resist brute-forcing. A refresh token is a random 256-bit value with no brute-forceable structure; hashing it slowly would only cost CPU for no security benefit. Using the same primitive for both would be the "looks careful, isn't" version of this problem.
+**Пароли хешируются через `scrypt`, refresh-токены — через `sha256`, и это осознанное различие.** Пароль короткий и придуман человеком, поэтому нужен медленный, требовательный к памяти хеш для защиты от перебора. Refresh-токен — случайное 256-битное значение без структуры, которую можно перебирать; медленный хеш тут только тратил бы CPU без пользы для безопасности. Использовать один и тот же примитив для обоих случаев — это версия "выглядит аккуратно, а на деле нет".
 
-**The bot has almost no business logic of its own.** `bot/services/` only translates backend responses into bot-shaped `(success, message, data)` tuples and Russian-language user messages. Every actual rule (can this user submit another request, is this status transition allowed) lives once, in the backend, and both the bot and any future client see the same behavior automatically.
+**У бота почти нет собственной бизнес-логики.** `bot/services/` только переводит ответы API в кортежи `(успех, сообщение, данные)` и русскоязычные сообщения пользователю. Каждое реальное правило (может ли пользователь создать ещё одну заявку, допустим ли переход статуса) живёт один раз, в backend'е, и бот, и любой будущий клиент автоматически видят одно и то же поведение.
 
-**Tests are split by what they actually exercise.** `tests/*.py` calls service and route functions directly — fast, but blind to anything that only breaks through FastAPI's real routing, dependency injection, or Pydantic serialization. `tests/integration/*.py` sends real HTTP requests through the actual ASGI app (`httpx`/`TestClient`) against an isolated in-memory SQLite database per test. Both layers exist because they catch different classes of bugs — several real ones (an unwired `Depends`, a route path typo, a response-schema mismatch the client silently choked on) were only ever caught by the second kind, in this project's own history.
+**Тесты разделены по тому, что они реально проверяют.** `tests/*.py` вызывает сервисные и роутовые функции напрямую — быстро, но слепо к тому, что ломается только на уровне настоящего роутинга FastAPI, dependency injection или сериализации Pydantic. `tests/integration/*.py` отправляет настоящие HTTP-запросы через реальное ASGI-приложение (`httpx`/`TestClient`) в изолированную SQLite-базу в памяти, создаваемую заново для каждого теста. Оба слоя существуют, потому что ловят разные классы багов — несколько реальных (неподключённый `Depends`, опечатка в пути роута, рассинхрон схемы ответа, который клиент тихо не мог распарсить) в истории этого проекта были пойманы только вторым видом тестов.
 
-## Tech stack
+## Стек технологий
 
-| Layer | Choice |
+| Слой | Выбор |
 |---|---|
-| API framework | FastAPI (async), Uvicorn |
-| Bot framework | aiogram 3 |
-| Database | PostgreSQL 16 |
-| ORM / migrations | SQLAlchemy 2.0 (async), Alembic |
-| Auth | JWT (`python-jose`), `scrypt` password hashing, HMAC service tokens |
-| Validation | Pydantic v2 |
-| Testing | pytest, pytest-asyncio, httpx |
-| Runtime | Python 3.12, Docker / Docker Compose |
+| API-фреймворк | FastAPI (async), Uvicorn |
+| Фреймворк бота | aiogram 3 |
+| База данных | PostgreSQL 16 |
+| ORM / миграции | SQLAlchemy 2.0 (async), Alembic |
+| Авторизация | JWT (`python-jose`), хеширование паролей `scrypt`, HMAC-сервисные токены |
+| Валидация | Pydantic v2 |
+| Тестирование | pytest, pytest-asyncio, httpx |
+| Окружение | Python 3.12, Docker / Docker Compose |
 
-## Project structure
+## Структура проекта
 
 ```
-app/                  FastAPI backend
-  routes/              thin HTTP layer — request/response mapping only
-  services/            business logic, one module per domain (auth, admin, user, request, notification)
-  models/              SQLAlchemy models
-  schemas/             Pydantic request/response schemas
-  dependencies/         auth.py (JWT), service_auth.py (bot service token)
-  security.py          password hashing, JWT encode/decode
-  database.py          engine, session factory
+app/                  backend на FastAPI
+  routes/              тонкий HTTP-слой — только маппинг запрос/ответ
+  services/            бизнес-логика, один модуль на домен (auth, admin, user, request, notification)
+  models/              модели SQLAlchemy
+  schemas/             Pydantic-схемы запросов/ответов
+  dependencies/         auth.py (JWT), service_auth.py (сервисный токен бота)
+  security.py          хеширование паролей, кодирование/декодирование JWT
+  database.py          engine, фабрика сессий
 
-bot/                  aiogram Telegram bot
-  handlers/            Telegram-facing entry points (commands, callbacks)
-  services/            translates API responses into bot-shaped results
-  clients/api_client.py  typed HTTP client — the bot's only path to the backend
-  middlewares/         admin-auth middleware (checks admin status once per update)
+bot/                  Telegram-бот на aiogram
+  handlers/            точки входа со стороны Telegram (команды, callback'и)
+  services/            переводит ответы API в результаты, понятные боту
+  clients/api_client.py  типизированный HTTP-клиент — единственный путь бота к backend'у
+  middlewares/         middleware проверки прав админа (один раз на входящее событие)
   keyboards/, presenters/, dtos.py
 
-scheduler/            background cleanup job
-migrations/            Alembic revisions
-requirements/          split per service (base/api/bot/scheduler/dev) — each Docker image installs only what it needs
-docker/                one Dockerfile per service
-tests/                 unit-style tests (direct function calls)
-tests/integration/      HTTP-level tests against the real app
-enums.py               shared status vocabulary (root-level so the bot doesn't need to import the database layer just to read an enum)
+scheduler/            фоновая задача очистки
+migrations/            ревизии Alembic
+requirements/          разбиты по сервисам (base/api/bot/scheduler/dev) — каждый Docker-образ ставит только то, что нужно именно ему
+docker/                свой Dockerfile на каждый сервис
+tests/                 тесты уровня unit (прямые вызовы функций)
+tests/integration/      тесты уровня HTTP против настоящего приложения
+enums.py               общий словарь статусов (в корне, чтобы боту не нужно было тянуть слой БД ради одного enum'а)
 ```
 
-## Quickstart
+## Быстрый старт
 
-### Docker Compose (recommended)
+### Docker Compose (рекомендуется)
 
 ```bash
 cp .env.example .env
-# fill in BOT_TOKEN, JWT_SECRET_KEY, SERVICE_TOKEN, POSTGRES_* — see Configuration below
+# заполни BOT_TOKEN, JWT_SECRET_KEY, SERVICE_TOKEN, POSTGRES_* — см. раздел "Конфигурация"
 
 docker compose up --build
 ```
 
-This starts Postgres, the API (migrations run automatically on startup), the bot, and the scheduler — four containers, one command. The API is available at `http://localhost:8000` (`/docs` for interactive OpenAPI docs).
+Поднимает Postgres, API (миграции применяются автоматически при старте), бота и планировщик — четыре контейнера одной командой. API доступен на `http://localhost:8000` (`/docs` — интерактивная документация OpenAPI).
 
-### Local development
+### Локальная разработка
 
 ```bash
 python -m venv .venv && source .venv/bin/activate
-pip install -r requirements.txt   # pulls in everything needed to run + test locally
+pip install -r requirements.txt   # ставит всё нужное для запуска и тестов локально
 
-cp .env.example .env   # point DATABASE_URL at a local/dockerized Postgres
+cp .env.example .env   # укажи DATABASE_URL на локальную или докеризованную Postgres
 
 alembic upgrade head
 uvicorn app.main:app --reload
 
-# in another terminal
-./scripts/restart_bot.sh   # kills any stray bot process before starting a fresh one —
-                            # running two pollers against the same BOT_TOKEN causes Telegram
-                            # API conflicts and very confusing intermittent behavior
+# в другом терминале
+./scripts/restart_bot.sh   # убивает случайно оставшийся процесс бота перед запуском нового —
+                            # два поллера с одним BOT_TOKEN вызывают конфликт в Telegram API
+                            # и очень запутанное непредсказуемое поведение
 
-# in a third terminal, if you want the cleanup job running too
+# в третьем терминале, если нужен и планировщик
 python -m scheduler.main
 ```
 
-## Configuration
+## Конфигурация
 
-All settings are read from environment variables (`config.py`, via `pydantic-settings`). See `.env.example` for the full list with placeholder values. The ones worth knowing about:
+Все настройки читаются из переменных окружения (`config.py`, через `pydantic-settings`). Полный список с примерами значений — в `.env.example`. Что стоит знать отдельно:
 
-| Variable | Purpose |
+| Переменная | Назначение |
 |---|---|
-| `BOT_TOKEN` | Telegram bot token from [@BotFather](https://t.me/BotFather) |
-| `DATABASE_URL` | `postgresql+asyncpg://...` — note this must point at the `db` service by hostname inside Docker Compose, not `127.0.0.1` |
-| `JWT_SECRET_KEY`, `JWT_ALGORITHM`, `JWT_EXPIRE_MINUTES` | Access token signing |
-| `REFRESH_TOKEN_EXPIRE_DAYS` | Refresh token lifetime |
-| `SERVICE_TOKEN` | Shared secret the bot presents to the API (`X-Service-Token` header) |
-| `CORS_ALLOWED_ORIGINS` | JSON list of origins allowed to call the API with credentials (for the future web panel) |
-| `MAX_ACTIVE_REQUESTS` | How many open requests one user can have at once |
-| `COMPLETED_REQUEST_RETENTION_DAYS`, `CLEANUP_INTERVAL_SECONDS` | Scheduler behavior |
+| `BOT_TOKEN` | токен Telegram-бота от [@BotFather](https://t.me/BotFather) |
+| `DATABASE_URL` | `postgresql+asyncpg://...` — внутри Docker Compose должен указывать на сервис `db` по имени, а не на `127.0.0.1` |
+| `JWT_SECRET_KEY`, `JWT_ALGORITHM`, `JWT_EXPIRE_MINUTES` | подпись access-токена |
+| `REFRESH_TOKEN_EXPIRE_DAYS` | срок жизни refresh-токена |
+| `SERVICE_TOKEN` | общий секрет, который бот предъявляет API (заголовок `X-Service-Token`) |
+| `CORS_ALLOWED_ORIGINS` | JSON-список источников, которым разрешено обращаться к API с credentials (для будущей веб-панели) |
+| `MAX_ACTIVE_REQUESTS` | сколько открытых заявок может быть у одного пользователя одновременно |
+| `COMPLETED_REQUEST_RETENTION_DAYS`, `CLEANUP_INTERVAL_SECONDS` | поведение планировщика |
 
-Generate secrets with:
+Генерация секретов:
 ```bash
 python -c "import secrets; print(secrets.token_urlsafe(32))"
 ```
 
 ## API
 
-Interactive docs are auto-generated by FastAPI and available at `/docs` (Swagger UI) and `/redoc` once the API is running.
+Интерактивная документация генерируется FastAPI автоматически и доступна на `/docs` (Swagger UI) и `/redoc`, когда API запущен.
 
-At a glance:
+Коротко:
 
-| Endpoint | Auth | Purpose |
+| Эндпоинт | Авторизация | Назначение |
 |---|---|---|
-| `POST /auth/login/` | — | Admin login → access token (body) + refresh token (httpOnly cookie) |
-| `POST /auth/refresh/` | refresh cookie | Rotate access + refresh token |
-| `POST /auth/logout/` | refresh cookie | Revoke the current session |
-| `GET/POST /admins/` | JWT | List / create admin accounts |
-| `GET /admins/active` | service token | Bot-only: active admins for notification routing |
-| `GET/POST/PUT/DELETE /requests/*` | service token | Bot-only today: request lifecycle |
-| `GET/POST/PUT /users/*` | service token | Bot-only today: user records |
-| `GET /health/` | — | Liveness + real database connectivity check |
+| `POST /auth/login/` | — | Логин админа → access-токен (в теле) + refresh-токен (httpOnly cookie) |
+| `POST /auth/refresh/` | refresh-cookie | Ротация access + refresh токена |
+| `POST /auth/logout/` | refresh-cookie | Отзыв текущей сессии |
+| `GET/POST /admins/` | JWT | Список / создание админ-аккаунтов |
+| `GET /admins/active` | сервисный токен | Только для бота: активные админы для рассылки уведомлений |
+| `GET/POST/PUT/DELETE /requests/*` | сервисный токен | Пока только для бота: жизненный цикл заявок |
+| `GET/POST/PUT /users/*` | сервисный токен | Пока только для бота: записи пользователей |
+| `GET /health/` | — | Проверка живости + реального подключения к БД |
 
-## Testing
+## Тестирование
 
 ```bash
 pytest
 ```
 
-70 tests, two kinds:
+70 тестов, два вида:
 
-- **Unit-style** (`tests/`) — service, route, presenter, and bot-service logic, tested by calling functions directly with mocked dependencies. Fast, and precise about which unit is broken when one fails.
-- **Integration** (`tests/integration/`) — real HTTP requests through the actual FastAPI app (`httpx`/`TestClient`) against an isolated in-memory SQLite database created fresh per test. Covers the full login → refresh (rotation + reuse-detection) → logout flow, protected-route access control, and service-token enforcement — the things that only break at the wiring level, not inside any single function.
+- **Unit-уровень** (`tests/`) — сервисы, роуты, презентеры и логика бота, проверяются прямым вызовом функций с замоканными зависимостями. Быстро, и точно указывает, какой именно юнит сломался.
+- **Интеграционные** (`tests/integration/`) — настоящие HTTP-запросы через реальное FastAPI-приложение (`httpx`/`TestClient`) в изолированную SQLite-базу в памяти, создаваемую заново для каждого теста. Покрывают полный цикл логин → рефреш (ротация + детект повторного использования) → логаут, контроль доступа к защищённым роутам и проверку сервисного токена — то, что ломается только на уровне связки компонентов, а не внутри отдельной функции.
 
-## Extending & scaling
+## Расширение и масштабирование
 
-**Adding a new domain** (e.g. a new resource beyond users/requests/admins): add a model + migration, a `services/<domain>.py` with the business rules, a `schemas/<domain>_schemas.py`, and a thin `routes/<domain>_routes.py` that only maps exceptions to HTTP status codes. This is the same shape every existing domain already follows — nothing to invent.
+**Добавление нового домена** (ресурса помимо users/requests/admins): модель + миграция, `services/<domain>.py` с бизнес-правилами, `schemas/<domain>_schemas.py`, и тонкий `routes/<domain>_routes.py`, который только переводит исключения в HTTP-статусы. Ровно та же форма, что уже есть у каждого существующего домена — придумывать ничего не нужно.
 
-**Adding a new bot flow**: a handler in `bot/handlers/`, a service function in `bot/services/` that calls the API client and returns a `(success, message, data)` tuple, and a keyboard if it needs one. Business rules still belong in the backend, not here — the bot should stay a thin presentation layer.
+**Добавление нового сценария в боте**: хендлер в `bot/handlers/`, сервисная функция в `bot/services/`, которая зовёт API-клиент и возвращает кортеж `(успех, сообщение, данные)`, и клавиатура, если нужна. Бизнес-правила по-прежнему живут в backend'е, не здесь — бот должен оставаться тонким слоем представления.
 
-**Running multiple API replicas**: the API is stateless — no in-memory session state, refresh tokens live in Postgres, not in a process-local cache — so it's safe to run several instances behind a load balancer without any code changes. The bot, by contrast, must stay a single instance per `BOT_TOKEN` (Telegram's long-polling API only allows one active poller at a time; see `bot/main.py`'s file-lock guard).
+**Несколько реплик API**: API не хранит состояние — ни сессий в памяти, ни refresh-токенов вне Postgres — поэтому можно безопасно запускать несколько экземпляров за балансировщиком нагрузки без изменений в коде. Бот, наоборот, должен оставаться в единственном экземпляре на один `BOT_TOKEN` (Telegram допускает только одного активного получателя обновлений через long polling; см. файловую блокировку в `bot/main.py`).
 
-**Swapping infrastructure**: Postgres, the JWT secret, and the service token are all just environment variables — pointing `DATABASE_URL` at a managed database (RDS, Cloud SQL, etc.) instead of the bundled container requires no code changes.
+**Замена инфраструктуры**: Postgres, JWT-секрет и сервисный токен — просто переменные окружения; чтобы указать на управляемую базу данных (RDS, Cloud SQL и т.п.) вместо контейнера из докер-компоуза, изменения в коде не нужны.
 
-**Building the React admin panel**: the backend is already shaped for it. CORS is configured with `allow_credentials=True` for a browser client; refresh tokens are already delivered as httpOnly cookies (not accessible to JS, so an XSS bug can't steal a long-lived session); `GET /admins/` (JWT-protected, distinct from the bot's service-token-protected `GET /admins/active`) exists specifically so an admin panel can list accounts, not just create them blindly.
+**Разработка React-панели**: backend уже готов под неё. CORS настроен с `allow_credentials=True` для браузерного клиента; refresh-токены уже доставляются как httpOnly cookie (недоступны из JS, поэтому XSS-уязвимость не сможет украсть долгоживущую сессию); `GET /admins/` (защищён JWT, отдельно от защищённого сервисным токеном `GET /admins/active` для бота) существует специально, чтобы панель могла показать список аккаунтов, а не создавать их вслепую.
 
 ## Roadmap
 
-- [ ] React + TypeScript admin panel (backend auth/CORS already in place for it)
-- [ ] Pagination on list endpoints (not yet needed at current data volume)
-- [ ] Dedicated test coverage for the bot's aiogram middleware and admin-service layer (currently verified manually, not by an automated suite)
+- [ ] Админ-панель на React + TypeScript (авторизация и CORS на backend уже готовы под неё)
+- [ ] Пагинация на списочных эндпоинтах (пока не нужна при текущем объёме данных)
+- [ ] Отдельное покрытие тестами middleware бота и его admin-сервиса (сейчас проверено только вручную)
 
-## License
+## Лицензия
 
-Not yet decided — pick one before treating this as open source (MIT is the common default for portfolio projects; something more restrictive if you intend to keep commercial rights).
+Пока не выбрана — определись с ней, прежде чем считать проект открытым (MIT — стандартный выбор для портфолио-проектов; что-то более ограничивающее, если планируешь сохранить коммерческие права).
