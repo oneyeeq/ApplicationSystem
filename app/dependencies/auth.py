@@ -10,14 +10,12 @@ from app.services.exceptions import AdminNotFoundError, AdminIsNotActiveError
 
 bearer_scheme = HTTPBearer()
 
-async def get_current_admin(
-    credentials: HTTPAuthorizationCredentials = Depends(bearer_scheme),
-    db: AsyncSession = Depends(get_db)
-) -> Admin:
+
+async def get_admin_from_token(token: str, db: AsyncSession) -> Admin:
+    """Общая логика проверки JWT, переиспользуется get_current_admin
+    и комбинированной проверкой в service_or_admin_auth.py."""
     try:
-        login = decode_access_token(
-            credentials.credentials,
-        )
+        login = decode_access_token(token)
         result = await db.execute(select(Admin).where(Admin.login == login))
         admin = result.scalar_one_or_none()
         if not admin:
@@ -40,3 +38,10 @@ async def get_current_admin(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Аккаунт администратора деактивирован",
         )
+
+
+async def get_current_admin(
+    credentials: HTTPAuthorizationCredentials = Depends(bearer_scheme),
+    db: AsyncSession = Depends(get_db)
+) -> Admin:
+    return await get_admin_from_token(credentials.credentials, db)

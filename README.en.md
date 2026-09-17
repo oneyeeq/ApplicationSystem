@@ -169,8 +169,8 @@ At a glance:
 | `POST /auth/logout/` | refresh cookie | Revoke the current session |
 | `GET/POST /admins/` | JWT | List / create admin accounts |
 | `GET /admins/active` | service token | Bot-only: active admins for notification routing |
-| `GET/POST/PUT/DELETE /requests/*` | service token | Bot-only today: request lifecycle |
-| `GET/POST/PUT /users/*` | service token | Bot-only today: user records |
+| `GET/POST/PUT/DELETE /requests/*` | service token **or** JWT | Request lifecycle — usable by both the bot and the web panel |
+| `GET/POST/PUT /users/*` | service token **or** JWT | User records — usable by both the bot and the web panel |
 | `GET /health/` | — | Liveness + real database connectivity check |
 
 ## Testing
