@@ -280,7 +280,9 @@ async def handle_submit_request(
 async def handle_back_to_menu(callback: CallbackQuery, api_client: ApiClient):
     await callback.answer()
     await remove_inline_keyboard(callback)
-    await show_main_menu(callback.message, api_client, callback.from_user.id)
+    is_admin, _ = await admin_service.is_active_admin(api_client, callback.from_user.id)
+    reply_markup = admin_kb.admin_menu_keyboard() if is_admin else kb.START_KEYBOARD
+    await callback.message.answer("Выберите действие:", reply_markup=reply_markup)
 
 
 @router.callback_query(F.data == "cancelrequest")
