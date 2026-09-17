@@ -33,10 +33,8 @@ class UserData(BaseModel):
 class AdminData(BaseModel):
     model_config = ConfigDict(extra="ignore")
 
-    id: int
     tg_admin_id: int
     username: str | None
-    is_active: bool
 
 
 class CanCreateRequestData(BaseModel):

@@ -10,6 +10,7 @@ from app.models.user_model import User
 from app.database import session_factory
 from app.services.exceptions import AdminNotFoundError
 from config import settings
+from enums import StatusEnum
 
 logger = logging.getLogger(__name__)
 
@@ -57,9 +58,9 @@ async def notify_user_about_status(request) -> None:
         return
 
     status_text = {
-        "в_процессе": "Заявка принята и взята в работу.",
-        "завершена": "Заявка завершена.",
-        "отклонена": "Заявка отклонена.",
+        StatusEnum.IN_PROGRESS.value: "Заявка принята и взята в работу.",
+        StatusEnum.COMPLETED.value: "Заявка завершена.",
+        StatusEnum.REJECTED.value: "Заявка отклонена.",
     }.get(request.status.value, "Статус заявки изменён.")
 
     bot = Bot(token=settings.BOT_TOKEN)
