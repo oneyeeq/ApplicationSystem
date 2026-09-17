@@ -7,6 +7,7 @@ import bot.keyboards.admin_keyboards as admin_kb
 import bot.keyboards.request_keyboard as req_kb
 import bot.services.admin_service as admin_service
 import bot.services.start_service as start_service
+from bot.handlers.request_handler import show_main_menu
 
 router = Router()
 
@@ -57,9 +58,10 @@ async def handle_help_command(message: Message, api_client: ApiClient):
     is_admin, _ = await admin_service.is_active_admin(api_client, message.from_user.id)
     if is_admin:
         await message.answer(_get_admin_help_text())
-        return
+    else:
+        await message.answer(_get_user_help_text())
 
-    await message.answer(_get_user_help_text())
+    await show_main_menu(message, api_client)
 
 
 def _get_admin_help_text() -> str:
@@ -94,4 +96,5 @@ async def handle_help_callback(callback: types.CallbackQuery, api_client: ApiCli
     await callback.message.answer(
         _get_admin_help_text() if is_admin else _get_user_help_text()
     )
+    await show_main_menu(callback.message, api_client)
                          

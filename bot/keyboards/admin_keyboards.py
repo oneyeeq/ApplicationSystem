@@ -44,21 +44,34 @@ def admin_menu_keyboard() -> InlineKeyboardMarkup:
     )
 
 
-def admin_notification_request_keyboard(request_id: int) -> InlineKeyboardMarkup:
-    return InlineKeyboardMarkup(
-        inline_keyboard=[
+def admin_notification_request_keyboard(
+    request_id: int,
+    include_back_to_menu: bool = True,
+) -> InlineKeyboardMarkup:
+    keyboard = [
+        [
+            InlineKeyboardButton(
+                text="Принять",
+                callback_data=f"take_notification_request:{request_id}",
+            ),
+            InlineKeyboardButton(
+                text="Отклонить",
+                callback_data=f"reject_notification_request:{request_id}",
+            ),
+        ]
+    ]
+
+    if include_back_to_menu:
+        keyboard.append(
             [
                 InlineKeyboardButton(
-                    text="Принять",
-                    callback_data=f"take_notification_request:{request_id}",
-                ),
-                InlineKeyboardButton(
-                    text="Отклонить",
-                    callback_data=f"reject_notification_request:{request_id}",
-                ),
+                    text="Вернуться в меню",
+                    callback_data="admin_back_to_menu",
+                )
             ]
-        ]
-    )
+        )
+
+    return InlineKeyboardMarkup(inline_keyboard=keyboard)
 
 
 def admin_new_request_keyboard(

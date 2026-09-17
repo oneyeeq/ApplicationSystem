@@ -120,6 +120,7 @@ async def handle_my_requests(callback: CallbackQuery, api_client: ApiClient):
 
     await callback.answer()
     await callback.message.answer(format_user_requests(requests))
+    await show_main_menu(callback.message, api_client)
 
 
 @router.message(Command("my_requests"))
@@ -146,6 +147,7 @@ async def handle_my_requests_command(message: Message, api_client: ApiClient):
         return
 
     await message.answer(format_user_requests(requests))
+    await show_main_menu(message, api_client)
 
 
 @router.message(F.text == "Отменить заявку")
