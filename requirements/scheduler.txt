@@ -1,0 +1,4 @@
+-r base.txt
+
+sqlalchemy==2.0.53
+asyncpg==0.31.0

@@ -1,0 +1,9 @@
+-r base.txt
+
+fastapi==0.141.1
+uvicorn[standard]==0.53.0
+sqlalchemy==2.0.53
+asyncpg==0.31.0
+alembic==1.20.0
+python-jose[cryptography]==3.5.0
+gunicorn==26.2.0
