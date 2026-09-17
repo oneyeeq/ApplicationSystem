@@ -20,11 +20,12 @@ AVAILABLE_SERVICE_NAMES = ["Сайт", "Скрипт", "Бот"]
 async def show_main_menu(
     message: Message,
     api_client: ApiClient,
+    telegram_id: int,
     text: str = "Выберите действие:",
 ):
     is_admin, _ = await admin_service.is_active_admin(
         api_client,
-        message.from_user.id,
+        telegram_id,
     )
     reply_markup = admin_kb.admin_menu_keyboard() if is_admin else kb.START_KEYBOARD
     await message.answer(text, reply_markup=ReplyKeyboardRemove())
@@ -52,7 +53,9 @@ async def handle_request_command(
 ):
     is_admin, _ = await admin_service.is_active_admin(api_client, message.from_user.id)
     if is_admin:
-        await show_main_menu(message, api_client, "Администратору этот сценарий недоступен.")
+        await show_main_menu(
+            message, api_client, message.from_user.id, "Администратору этот сценарий недоступен."
+        )
         return
 
     is_allowed, status_text = await request_service.can_start_request(
@@ -60,7 +63,9 @@ async def handle_request_command(
         message.from_user.id,
     )
     if not is_allowed:
-        await show_main_menu(message, api_client, status_text or "Сервис временно недоступен.")
+        await show_main_menu(
+            message, api_client, message.from_user.id, status_text or "Сервис временно недоступен."
+        )
         return
 
     await state.set_state(RequestForm.service_name)
@@ -78,7 +83,7 @@ async def handle_request_callback(
     if is_admin:
         await remove_inline_keyboard(callback)
         await callback.answer("Администратору этот сценарий недоступен.", show_alert=True)
-        await show_main_menu(callback.message, api_client)
+        await show_main_menu(callback.message, api_client, telegram_id)
         return
 
     is_allowed, status_text = await request_service.can_start_request(api_client, telegram_id)
@@ -86,7 +91,9 @@ async def handle_request_callback(
     if not is_allowed:
         await remove_inline_keyboard(callback)
         await callback.answer()
-        await show_main_menu(callback.message, api_client, status_text or "Сервис временно недоступен.")
+        await show_main_menu(
+            callback.message, api_client, telegram_id, status_text or "Сервис временно недоступен."
+        )
         return
 
     await state.set_state(RequestForm.service_name)
@@ -186,6 +193,7 @@ async def _cancel_and_show_menu(
     await show_main_menu(
         message,
         api_client,
+        message.from_user.id,
         "Выберите действие:" if is_admin else text,
     )
 
@@ -244,7 +252,7 @@ async def handle_submit_request(
     if not request_data.get("service_name") or not request_data.get("phone_number"):
         await state.clear()
         await callback.answer("Сессия заявки устарела.", show_alert=True)
-        await show_main_menu(callback.message, api_client, "Сессия заявки устарела.")
+        await show_main_menu(callback.message, api_client, telegram_id, "Сессия заявки устарела.")
         return
 
     is_success, status_text, _ = await request_service.submit_request(
@@ -259,19 +267,20 @@ async def handle_submit_request(
         await show_main_menu(
             callback.message,
             api_client,
+            telegram_id,
             status_text or "Произошла ошибка. Попробуйте позже.",
         )
         return
 
     await state.clear()
-    await show_main_menu(callback.message, api_client, status_text or "Заявка отправлена.")
+    await show_main_menu(callback.message, api_client, telegram_id, status_text or "Заявка отправлена.")
 
 
 @router.callback_query(F.data == "back_to_menu")
 async def handle_back_to_menu(callback: CallbackQuery, api_client: ApiClient):
     await callback.answer()
     await remove_inline_keyboard(callback)
-    await show_main_menu(callback.message, api_client)
+    await show_main_menu(callback.message, api_client, callback.from_user.id)
 
 
 @router.callback_query(F.data == "cancelrequest")
@@ -283,4 +292,4 @@ async def handle_cancel_request_callback(
     await state.clear()
     await remove_inline_keyboard(callback)
     await callback.answer()
-    await show_main_menu(callback.message, api_client, "Заявка отменена.")
+    await show_main_menu(callback.message, api_client, callback.from_user.id, "Заявка отменена.")
