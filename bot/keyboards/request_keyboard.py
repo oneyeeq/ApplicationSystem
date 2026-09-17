@@ -57,6 +57,17 @@ PHONE_KEYBOARD = ReplyKeyboardMarkup(
     one_time_keyboard=True,
 )
 
+BACK_TO_MENU_KEYBOARD = InlineKeyboardMarkup(
+    inline_keyboard=[
+        [
+            InlineKeyboardButton(
+                text="Вернуться в меню",
+                callback_data="back_to_menu",
+            )
+        ]
+    ]
+)
+
 SUBMIT_KEYBOARD = InlineKeyboardMarkup(
     inline_keyboard=[
         [

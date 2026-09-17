@@ -119,8 +119,10 @@ async def handle_my_requests(callback: CallbackQuery, api_client: ApiClient):
         return
 
     await callback.answer()
-    await callback.message.answer(format_user_requests(requests))
-    await show_main_menu(callback.message, api_client)
+    await callback.message.answer(
+        format_user_requests(requests),
+        reply_markup=kb.BACK_TO_MENU_KEYBOARD,
+    )
 
 
 @router.message(Command("my_requests"))
@@ -146,8 +148,10 @@ async def handle_my_requests_command(message: Message, api_client: ApiClient):
         await message.answer("У вас пока нет заявок.")
         return
 
-    await message.answer(format_user_requests(requests))
-    await show_main_menu(message, api_client)
+    await message.answer(
+        format_user_requests(requests),
+        reply_markup=kb.BACK_TO_MENU_KEYBOARD,
+    )
 
 
 @router.message(F.text == "Отменить заявку")
@@ -261,6 +265,13 @@ async def handle_submit_request(
 
     await state.clear()
     await show_main_menu(callback.message, api_client, status_text or "Заявка отправлена.")
+
+
+@router.callback_query(F.data == "back_to_menu")
+async def handle_back_to_menu(callback: CallbackQuery, api_client: ApiClient):
+    await callback.answer()
+    await remove_inline_keyboard(callback)
+    await show_main_menu(callback.message, api_client)
 
 
 @router.callback_query(F.data == "cancelrequest")
