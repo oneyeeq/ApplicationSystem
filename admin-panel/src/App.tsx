@@ -30,7 +30,11 @@ function App() {
   restoreSession()
 }, [])
   if (isCheckingAuth) {
-  return <p>Загрузка...</p>
+    return (
+      <div style={{ display: 'flex', minHeight: '100vh', alignItems: 'center', justifyContent: 'center' }}>
+        <p>Загрузка...</p>
+      </div>
+    )
   }
   return (
     <Routes>

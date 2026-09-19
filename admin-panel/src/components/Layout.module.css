@@ -1,0 +1,51 @@
+.shell {
+  display: flex;
+  min-height: 100vh;
+}
+
+.sidebar {
+  width: 220px;
+  flex-shrink: 0;
+  background: var(--bg-card);
+  border-right: 1px solid var(--border);
+  padding: 24px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.brand {
+  font-size: 16px;
+  font-weight: 600;
+  margin: 0 0 20px;
+  padding: 0 12px;
+}
+
+.navLink {
+  color: var(--text-muted);
+  text-decoration: none;
+  padding: 10px 12px;
+  border-radius: 6px;
+  font-size: 15px;
+}
+
+.navLink:hover {
+  background: var(--bg-hover);
+  color: var(--text);
+}
+
+.navLinkActive {
+  background: var(--bg-hover);
+  color: var(--text);
+  font-weight: 600;
+}
+
+.logoutButton {
+  margin-top: auto;
+}
+
+.content {
+  flex: 1;
+  min-width: 0;
+  padding: 32px 40px;
+}
