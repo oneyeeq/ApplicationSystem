@@ -20,7 +20,21 @@ async def test_start_service_translates_missing_user():
 
     result = await start_service.get_user(api_client, 3001)
 
-    assert result == (False, "Пользователь не найден")
+    assert result == (None, "Пользователь не найден")
+
+
+async def test_start_service_returns_found_user():
+    from bot.dtos import UserData
+
+    user = UserData(id=1, tg_user_id=3001, username="tester", is_active=False, active_requests=0)
+    api_client = AsyncMock()
+    api_client.get_user.return_value = (user, "ok")
+
+    found_user, status_text = await start_service.get_user(api_client, 3001)
+
+    assert found_user == user
+    assert found_user.is_active is False
+    assert status_text is None
 
 
 async def test_request_service_translates_api_limit():

@@ -1,6 +1,6 @@
 from aiogram import F, Router, types
 from aiogram.filters import Command, CommandStart
-from aiogram.types import Message
+from aiogram.types import Message, ReplyKeyboardRemove
 
 from bot.clients.api_client import ApiClient
 import bot.keyboards.admin_keyboards as admin_kb
@@ -11,21 +11,22 @@ import bot.services.start_service as start_service
 router = Router()
 
 
-async def _get_start_keyboard(api_client: ApiClient, telegram_id: int):
-    is_admin, _ = await admin_service.is_active_admin(api_client, telegram_id)
-    if is_admin:
-        return admin_kb.admin_menu_keyboard()
-    return req_kb.START_KEYBOARD
-
-
 @router.message(CommandStart())
 async def handle_start_command(message: types.Message, api_client: ApiClient):
     telegram_id = message.from_user.id
     username = message.from_user.username
 
-    is_registered, status_text = await start_service.get_user(api_client, telegram_id)
+    is_admin, _ = await admin_service.is_active_admin(api_client, telegram_id)
+    if is_admin:
+        await message.answer(
+            "Выберите действие:",
+            reply_markup=admin_kb.admin_menu_keyboard(),
+        )
+        return
 
-    if not is_registered and status_text == "Пользователь не найден":
+    user, status_text = await start_service.get_user(api_client, telegram_id)
+
+    if user is None and status_text == "Пользователь не найден":
         is_registered, status_text = await start_service.create_user(
             api_client,
             telegram_id,
@@ -36,20 +37,18 @@ async def handle_start_command(message: types.Message, api_client: ApiClient):
             return
 
         await message.answer("Пользователь зарегистрирован.")
-        await message.answer(
-            "Выберите действие:",
-            reply_markup=await _get_start_keyboard(api_client, telegram_id),
-        )
+        await message.answer("Выберите действие:", reply_markup=req_kb.START_KEYBOARD)
         return
 
-    if not is_registered:
+    if user is None:
         await message.answer(status_text or "Ошибка.")
         return
 
-    await message.answer(
-        "Выберите действие:",
-        reply_markup=await _get_start_keyboard(api_client, telegram_id),
-    )
+    if not user.is_active:
+        await message.answer("Вы заблокированы.", reply_markup=ReplyKeyboardRemove())
+        return
+
+    await message.answer("Выберите действие:", reply_markup=req_kb.START_KEYBOARD)
 
 
 @router.message(Command("help"))

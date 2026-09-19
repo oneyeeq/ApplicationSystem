@@ -1,13 +1,14 @@
 from bot.clients.api_client import ApiClient
+from bot.dtos import UserData
 
 
-async def get_user(api_client: ApiClient, telegram_id: int) -> tuple[bool, str | None]:
-    _, status = await api_client.get_user(telegram_id)
+async def get_user(api_client: ApiClient, telegram_id: int) -> tuple[UserData | None, str | None]:
+    user, status = await api_client.get_user(telegram_id)
     if status == "ok":
-        return True, None
+        return user, None
     if status == "not_found":
-        return False, "Пользователь не найден"
-    return False, "Ошибка сервиса"
+        return None, "Пользователь не найден"
+    return None, "Ошибка сервиса"
 
 
 async def create_user(
