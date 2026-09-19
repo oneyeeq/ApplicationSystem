@@ -8,7 +8,9 @@ from app.security import hash_password
 from app.services.exceptions import AdminAlreadyExistsError, AdminNotFoundError
 
 async def get_active_admins(db: AsyncSession) -> list[Admin]:
-    result = await db.execute(select(Admin).where(Admin.is_active.is_(True)))
+    result = await db.execute(
+        select(Admin).where(Admin.is_active.is_(True), Admin.tg_admin_id.is_not(None))
+    )
     admins = list(result.scalars().all())
     if not admins:
         raise AdminNotFoundError("Активные админы не найдены")

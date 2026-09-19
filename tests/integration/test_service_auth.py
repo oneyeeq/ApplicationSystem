@@ -7,7 +7,7 @@ async def test_get_active_admins_with_valid_service_token(client):
     test_client, session_factory = client
     async with session_factory() as session:
         await admin_service.create_admin(
-            AdminCreate(login="admin", password="password123", tg_admin_id=None, username=None),
+            AdminCreate(login="admin", password="password123", tg_admin_id=12345, username=None),
             session,
         )
     response = test_client.get(
