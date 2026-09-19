@@ -1,5 +1,8 @@
 import { useEffect, useState } from 'react'
 import { useAuth } from '../auth/AuthContext'
+import { useApiFetch } from '../api/useApiFetch'
+import tableStyles from '../components/Table.module.css'
+import styles from './AdminsPage.module.css'
 
 interface AdminItem {
   id: number
@@ -11,81 +14,199 @@ interface AdminItem {
 
 function AdminsPage() {
   const { token } = useAuth()
+  const apiFetch = useApiFetch()
   const [admins, setAdmins] = useState<AdminItem[]>([])
   const [login, setLogin] = useState('')
   const [password, setPassword] = useState('')
+  const [tgAdminId, setTgAdminId] = useState('')
+  const [username, setUsername] = useState('')
   const [errorMessage, setErrorMessage] = useState('')
+
+  const [editingId, setEditingId] = useState<number | null>(null)
+  const [editTgAdminId, setEditTgAdminId] = useState('')
+  const [editUsername, setEditUsername] = useState('')
 
   useEffect(() => {
     async function loadAdmins() {
-      const response = await fetch('http://localhost:8000/admins/', {
-        headers: { Authorization: `Bearer ${token}` },
-        credentials: 'include',
-      })
+      const response = await apiFetch('/admins/')
       const data = await response.json()
       if (response.ok) {
         setAdmins(data)
       }
     }
     loadAdmins()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [token])
 
   async function handleCreateAdmin() {
-    const response = await fetch('http://localhost:8000/admins/', {
+    const response = await apiFetch('/admins/', {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${token}`,
-      },
-      credentials: 'include',
-      body: JSON.stringify({ login, password }),
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        login,
+        password,
+        tg_admin_id: tgAdminId ? parseInt(tgAdminId, 10) : null,
+        username: username || null,
+      }),
     })
     const data = await response.json()
     if (response.ok) {
       setAdmins([...admins, data])
       setLogin('')
       setPassword('')
+      setTgAdminId('')
+      setUsername('')
       setErrorMessage('')
     } else {
       setErrorMessage(typeof data.detail === 'string' ? data.detail : 'Некорректные данные')
     }
   }
 
-  return (
-    <div>
-      <h1>Админы</h1>
-      <table>
-        <thead>
-          <tr>
-            <th>Логин</th>
-            <th>Статус</th>
-          </tr>
-        </thead>
-        <tbody>
-          {admins.map((admin) => (
-            <tr key={admin.id}>
-              <td>{admin.login}</td>
-              <td>{admin.is_active ? 'активен' : 'не активен'}</td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
+  async function handleUpdateAdmin(adminId: number, body: Record<string, unknown>) {
+    const response = await apiFetch(`/admins/${adminId}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    })
+    const data = await response.json()
+    if (response.ok) {
+      setAdmins(admins.map((a) => (a.id === adminId ? data : a)))
+    }
+    return response.ok
+  }
 
-      <h2>Добавить админа</h2>
-      <input
-        value={login}
-        onChange={(e) => setLogin(e.target.value)}
-        placeholder="Логин"
-      />
-      <input
-        value={password}
-        type="password"
-        onChange={(e) => setPassword(e.target.value)}
-        placeholder="Пароль"
-      />
-      <button onClick={handleCreateAdmin}>Создать</button>
-      <p>{errorMessage}</p>
-    </div>
+  async function handleDeleteAdmin(adminId: number) {
+    const response = await apiFetch(`/admins/${adminId}`, { method: 'DELETE' })
+    if (response.ok) {
+      setAdmins(admins.filter((a) => a.id !== adminId))
+      setErrorMessage('')
+    } else {
+      const data = await response.json()
+      setErrorMessage(typeof data.detail === 'string' ? data.detail : 'Не удалось удалить админа')
+    }
+  }
+
+  function startEditing(admin: AdminItem) {
+    setEditingId(admin.id)
+    setEditTgAdminId(admin.tg_admin_id?.toString() ?? '')
+    setEditUsername(admin.username ?? '')
+  }
+
+  async function handleSaveEdit(adminId: number) {
+    const ok = await handleUpdateAdmin(adminId, {
+      tg_admin_id: editTgAdminId ? parseInt(editTgAdminId, 10) : null,
+      username: editUsername || null,
+    })
+    if (ok) {
+      setEditingId(null)
+    }
+  }
+
+  return (
+    <>
+      <h1>Админы</h1>
+      <div className={tableStyles.card}>
+        <table className={tableStyles.table}>
+          <thead>
+            <tr>
+              <th>ID</th>
+              <th>Логин</th>
+              <th>Telegram ID</th>
+              <th>Username</th>
+              <th>Статус</th>
+              <th>Действия</th>
+            </tr>
+          </thead>
+          <tbody>
+            {admins.map((admin) => (
+              <tr key={admin.id}>
+                <td>{admin.id}</td>
+                <td>{admin.login}</td>
+                <td>
+                  {editingId === admin.id ? (
+                    <input
+                      value={editTgAdminId}
+                      onChange={(e) => setEditTgAdminId(e.target.value)}
+                      placeholder="Telegram ID"
+                    />
+                  ) : (
+                    admin.tg_admin_id ?? 'не привязан'
+                  )}
+                </td>
+                <td>
+                  {editingId === admin.id ? (
+                    <input
+                      value={editUsername}
+                      onChange={(e) => setEditUsername(e.target.value)}
+                      placeholder="Username"
+                    />
+                  ) : admin.username ? (
+                    `@${admin.username}`
+                  ) : (
+                    'не указан'
+                  )}
+                </td>
+                <td>{admin.is_active ? 'активен' : 'не активен'}</td>
+                <td>
+                  {editingId === admin.id ? (
+                    <>
+                      <button className="primary" onClick={() => handleSaveEdit(admin.id)}>
+                        Сохранить
+                      </button>
+                      <button onClick={() => setEditingId(null)}>Отмена</button>
+                    </>
+                  ) : (
+                    <>
+                      <button onClick={() => startEditing(admin)}>Изменить Telegram</button>
+                      <button
+                        className={admin.is_active ? 'danger' : 'primary'}
+                        onClick={() => handleUpdateAdmin(admin.id, { is_active: !admin.is_active })}
+                      >
+                        {admin.is_active ? 'Заблокировать' : 'Разблокировать'}
+                      </button>
+                      <button className="danger" onClick={() => handleDeleteAdmin(admin.id)}>
+                        Удалить
+                      </button>
+                    </>
+                  )}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+
+      <div className={styles.section}>
+        <h2>Добавить админа</h2>
+        <div className={styles.form}>
+          <input
+            value={login}
+            onChange={(e) => setLogin(e.target.value)}
+            placeholder="Логин"
+          />
+          <input
+            value={password}
+            type="password"
+            onChange={(e) => setPassword(e.target.value)}
+            placeholder="Пароль"
+          />
+          <input
+            value={tgAdminId}
+            onChange={(e) => setTgAdminId(e.target.value)}
+            placeholder="Telegram ID (необязательно)"
+          />
+          <input
+            value={username}
+            onChange={(e) => setUsername(e.target.value)}
+            placeholder="Username (необязательно)"
+          />
+          <button className="primary" onClick={handleCreateAdmin}>
+            Создать
+          </button>
+        </div>
+        {errorMessage && <p className={styles.error}>{errorMessage}</p>}
+      </div>
+    </>
   )
 }
 

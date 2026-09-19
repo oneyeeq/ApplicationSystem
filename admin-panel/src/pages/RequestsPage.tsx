@@ -1,5 +1,7 @@
 import { useEffect, useState } from 'react'
 import { useAuth } from '../auth/AuthContext'
+import { useApiFetch } from '../api/useApiFetch'
+import tableStyles from '../components/Table.module.css'
 
 const STATUS = {
   NEW: 'новая',
@@ -21,29 +23,24 @@ interface RequestItem {
 function RequestsPage() {
   const [requests, setRequests] = useState<RequestItem[]>([])
   const { token } = useAuth()
+  const apiFetch = useApiFetch()
 
   useEffect(() => {
     async function loadRequests() {
-      const response = await fetch('http://localhost:8000/requests/', {
-        headers: { Authorization: `Bearer ${token}` },
-        credentials: 'include',
-      })
+      const response = await apiFetch('/requests/')
       const data = await response.json()
       if (response.ok) {
         setRequests(data)
       }
     }
     loadRequests()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [token])
 
   async function handleStatusChange(requestId: number, newStatus: string) {
-    const response = await fetch(`http://localhost:8000/requests/${requestId}`, {
+    const response = await apiFetch(`/requests/${requestId}`, {
       method: 'PUT',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${token}`,
-      },
-      credentials: 'include',
+      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ status: newStatus }),
     })
     const data = await response.json()
@@ -52,48 +49,79 @@ function RequestsPage() {
     }
   }
 
+  async function handleDeleteRequest(requestId: number) {
+    const response = await apiFetch(`/requests/${requestId}`, { method: 'DELETE' })
+    if (response.ok) {
+      setRequests(requests.filter((r) => r.id !== requestId))
+    }
+  }
+
   return (
-    <table>
-      <thead>
-        <tr>
-          <th>Услуга</th>
-          <th>Телефон</th>
-          <th>Статус</th>
-          <th>Действия</th>
-        </tr>
-      </thead>
-      <tbody>
-        {requests.map((request) => (
-          <tr key={request.id}>
-            <td>{request.service_name}</td>
-            <td>{request.phone_number}</td>
-            <td>{request.status}</td>
-            <td>
-              {request.status === STATUS.NEW && (
-                <>
-                  <button onClick={() => handleStatusChange(request.id, STATUS.IN_PROGRESS)}>
-                    В работу
-                  </button>{' '}
-                  <button onClick={() => handleStatusChange(request.id, STATUS.REJECTED)}>
-                    Отклонить
+    <>
+      <h1>Заявки</h1>
+      <div className={tableStyles.card}>
+        <table className={tableStyles.table}>
+          <thead>
+            <tr>
+              <th>ID</th>
+              <th>ID пользователя</th>
+              <th>Услуга</th>
+              <th>Телефон</th>
+              <th>Статус</th>
+              <th>Действия</th>
+            </tr>
+          </thead>
+          <tbody>
+            {requests.map((request) => (
+              <tr key={request.id}>
+                <td>{request.id}</td>
+                <td>{request.user_id}</td>
+                <td>{request.service_name}</td>
+                <td>{request.phone_number}</td>
+                <td>{request.status}</td>
+                <td>
+                  {request.status === STATUS.NEW && (
+                    <>
+                      <button
+                        className="primary"
+                        onClick={() => handleStatusChange(request.id, STATUS.IN_PROGRESS)}
+                      >
+                        В работу
+                      </button>
+                      <button
+                        className="danger"
+                        onClick={() => handleStatusChange(request.id, STATUS.REJECTED)}
+                      >
+                        Отклонить
+                      </button>
+                    </>
+                  )}
+                  {request.status === STATUS.IN_PROGRESS && (
+                    <>
+                      <button
+                        className="primary"
+                        onClick={() => handleStatusChange(request.id, STATUS.COMPLETED)}
+                      >
+                        Завершить
+                      </button>
+                      <button
+                        className="danger"
+                        onClick={() => handleStatusChange(request.id, STATUS.REJECTED)}
+                      >
+                        Отклонить
+                      </button>
+                    </>
+                  )}
+                  <button className="danger" onClick={() => handleDeleteRequest(request.id)}>
+                    Удалить
                   </button>
-                </>
-              )}
-              {request.status === STATUS.IN_PROGRESS && (
-                <>
-                  <button onClick={() => handleStatusChange(request.id, STATUS.COMPLETED)}>
-                    Завершить
-                  </button>{' '}
-                  <button onClick={() => handleStatusChange(request.id, STATUS.REJECTED)}>
-                    Отклонить
-                  </button>
-                </>
-              )}
-            </td>
-          </tr>
-        ))}
-      </tbody>
-    </table>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </>
   )
 }
 
