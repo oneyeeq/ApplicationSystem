@@ -36,3 +36,9 @@ class RefreshTokenInvalidError(Exception):
 
 class RefreshTokenExpiredError(Exception):
     pass
+
+class AdminSelfDeleteError(Exception):
+    pass
+
+class UserHasRequestsError(Exception):
+    pass

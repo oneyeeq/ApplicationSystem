@@ -4,7 +4,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.user_model import User
 from app.schemas.user_schemas import UserCreate, UserUpdate
-from app.services.exceptions import UserNotFoundError
+from app.services.exceptions import UserHasRequestsError, UserNotFoundError
 from app.services.request_service import has_reached_active_limit
 
 
@@ -48,6 +48,16 @@ async def update_user(db: AsyncSession, user_id: int, user_data: UserUpdate) -> 
     await db.commit()
     await db.refresh(user)
     return user
+
+async def delete_user(db: AsyncSession, user_id: int) -> None:
+    user = await get_user_by_id(db, user_id)
+    await db.delete(user)
+    try:
+        await db.commit()
+    except IntegrityError:
+        await db.rollback()
+        raise UserHasRequestsError("Нельзя удалить пользователя — у него есть заявки")
+
 
 async def can_create_request(db: AsyncSession, telegram_id: int) -> dict:
     result = await db.execute(select(User).where(User.tg_user_id == telegram_id))

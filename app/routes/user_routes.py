@@ -7,7 +7,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.database import get_db
 from app.schemas.user_schemas import UserCreate, UserResponse, UserUpdate
 from app.services import user_service
-from app.services.exceptions import UserNotFoundError
+from app.services.exceptions import UserHasRequestsError, UserNotFoundError
 from app.dependencies.service_or_admin_auth import verify_service_token_or_admin
 
 router = APIRouter(dependencies=[Depends(verify_service_token_or_admin)])
@@ -58,5 +58,15 @@ async def can_create_request(telegram_id: int, db: DbSession):
         return await user_service.can_create_request(db, telegram_id)
     except UserNotFoundError:
         raise HTTPException(status_code=404, detail="Пользователь не найден")
+
+@router.delete("/users/{user_id}")
+async def delete_user(user_id: int, db: DbSession):
+    try:
+        await user_service.delete_user(db, user_id)
+    except UserNotFoundError:
+        raise HTTPException(status_code=404, detail="Пользователь не найден")
+    except UserHasRequestsError:
+        raise HTTPException(status_code=409, detail="Нельзя удалить пользователя — у него есть заявки")
+    return {"message": "Пользователь удалён"}
 
 

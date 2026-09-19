@@ -21,6 +21,8 @@ class AdminResponse(BaseModel):
 
 class AdminUpdate(BaseModel):
     is_active: bool | None = None
+    tg_admin_id: int | None = None
+    username: str | None = None
 
 class AdminNotificationResponse(BaseModel):
     tg_admin_id: int | None
