@@ -13,6 +13,7 @@ class AdminResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
     id: int
+    login: str
     tg_admin_id: int | None
     username: str | None = None
     is_active: bool
