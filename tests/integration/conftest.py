@@ -2,6 +2,7 @@ from collections.abc import AsyncIterator
 from fastapi.testclient import TestClient
 
 import pytest_asyncio
+from sqlalchemy import event
 from sqlalchemy.ext.asyncio import (
     AsyncSession,
     async_sessionmaker,
@@ -15,6 +16,11 @@ from app.main import app
 @pytest_asyncio.fixture
 async def client() -> AsyncIterator[AsyncSession]:
     engine = create_async_engine("sqlite+aiosqlite:///:memory:")
+
+    @event.listens_for(engine.sync_engine, "connect")
+    def _enable_foreign_keys(dbapi_connection, connection_record):
+        dbapi_connection.execute("PRAGMA foreign_keys=ON")
+
     async with engine.begin() as session:
         await session.run_sync(Base.metadata.create_all)
 
