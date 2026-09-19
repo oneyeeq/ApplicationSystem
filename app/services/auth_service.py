@@ -53,6 +53,8 @@ async def refresh_access_token(
         raise RefreshTokenInvalidError("Токен не найден")
     expires_at = stored_token.expires_at
     if expires_at.tzinfo is None:
+        # SQLite (used by the test suite) doesn't honor DateTime(timezone=True) and
+        # returns naive values, even though Postgres (production) returns aware ones.
         expires_at = expires_at.replace(tzinfo=timezone.utc)
     if expires_at < datetime.now(timezone.utc):
         raise RefreshTokenExpiredError("Токен истёк")
