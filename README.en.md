@@ -4,7 +4,7 @@
 
 A production-style service-request platform: a Telegram bot for customers and admins, a FastAPI backend, and a scheduler for housekeeping — all running behind a real authentication layer, not a demo stub.
 
-Customers submit service requests through a Telegram bot. Admins review, accept, complete, or reject them — either through the same bot or (soon) a web admin panel. The backend is the single source of truth for both.
+Customers submit service requests through a Telegram bot. Admins review, accept, complete, or reject them — either through the same bot or through a React web admin panel. The backend is the single source of truth for both.
 
 Built as a portfolio project, but engineered like it has to survive contact with real users: JWT access/refresh tokens with rotation and theft detection, a separate service-to-service auth model for the bot, async SQLAlchemy + Alembic migrations, a layered bot architecture, and a test suite that includes real HTTP-level integration tests, not just mocked unit tests.
 
@@ -60,6 +60,8 @@ These are the parts worth a second look if you're evaluating the code, not just 
 
 **The bot has almost no business logic of its own.** `bot/services/` only translates backend responses into bot-shaped `(success, message, data)` tuples and Russian-language user messages. Every actual rule (can this user submit another request, is this status transition allowed) lives once, in the backend, and both the bot and any future client see the same behavior automatically.
 
+**The web panel keeps the access token in memory only; the refresh token lives only in the backend's httpOnly cookie.** On startup the panel silently restores the session via `POST /auth/refresh/` (the cookie goes along automatically; JS can't even read it). Any request that comes back 401 (the access token lives only 30 minutes) goes through a shared interceptor, `useApiFetch`, which refreshes the token and retries the request once before giving up and logging out. `localStorage` is deliberately never used for the token — that's the whole point, since it closes off session theft via XSS. See `admin-panel/src/api/useApiFetch.ts`.
+
 **Tests are split by what they actually exercise.** `tests/*.py` calls service and route functions directly — fast, but blind to anything that only breaks through FastAPI's real routing, dependency injection, or Pydantic serialization. `tests/integration/*.py` sends real HTTP requests through the actual ASGI app (`httpx`/`TestClient`) against an isolated in-memory SQLite database per test. Both layers exist because they catch different classes of bugs — several real ones (an unwired `Depends`, a route path typo, a response-schema mismatch the client silently choked on) were only ever caught by the second kind, in this project's own history.
 
 ## Tech stack
@@ -74,6 +76,7 @@ These are the parts worth a second look if you're evaluating the code, not just 
 | Validation | Pydantic v2 |
 | Testing | pytest, pytest-asyncio, httpx |
 | Runtime | Python 3.12, Docker / Docker Compose |
+| Web panel | React 19 + TypeScript, Vite, React Router, CSS Modules |
 
 ## Project structure
 
@@ -101,6 +104,12 @@ docker/                one Dockerfile per service
 tests/                 unit-style tests (direct function calls)
 tests/integration/      HTTP-level tests against the real app
 enums.py               shared status vocabulary (root-level so the bot doesn't need to import the database layer just to read an enum)
+
+admin-panel/           React + TypeScript web panel (SPA, Vite)
+  src/api/               401 interceptor with automatic access-token refresh
+  src/auth/              auth context, route protection
+  src/components/        shared shell (sidebar, tables, ErrorBoundary)
+  src/pages/             Login, Requests, Admins, Users
 ```
 
 ## Quickstart
@@ -136,6 +145,16 @@ uvicorn app.main:app --reload
 python -m scheduler.main
 ```
 
+### Web panel (React)
+
+```bash
+cd admin-panel
+npm install
+npm run dev
+```
+
+Comes up on `http://localhost:5173` and talks to the API on `http://localhost:8000`. Make sure the backend is already running (see above) and that `CORS_ALLOWED_ORIGINS` in `.env` includes `http://localhost:5173` (it does by default). The panel isn't wired into `docker-compose.yml` — it runs separately via the Vite dev server.
+
 ## Configuration
 
 All settings are read from environment variables (`config.py`, via `pydantic-settings`). See `.env.example` for the full list with placeholder values. The ones worth knowing about:
@@ -167,10 +186,10 @@ At a glance:
 | `POST /auth/login/` | — | Admin login → access token (body) + refresh token (httpOnly cookie) |
 | `POST /auth/refresh/` | refresh cookie | Rotate access + refresh token |
 | `POST /auth/logout/` | refresh cookie | Revoke the current session |
-| `GET/POST /admins/` | JWT | List / create admin accounts |
-| `GET /admins/active` | service token | Bot-only: active admins for notification routing |
+| `GET/POST/PUT/DELETE /admins/*` | JWT | Full admin-account lifecycle (self-deletion blocked) |
+| `GET /admins/active` | service token | Bot-only: active admins with a linked Telegram account, for notification routing |
 | `GET/POST/PUT/DELETE /requests/*` | service token **or** JWT | Request lifecycle — usable by both the bot and the web panel |
-| `GET/POST/PUT /users/*` | service token **or** JWT | User records — usable by both the bot and the web panel |
+| `GET/POST/PUT/DELETE /users/*` | service token **or** JWT | User records — usable by both the bot and the web panel (deletion blocked if the user has requests) |
 | `GET /health/` | — | Liveness + real database connectivity check |
 
 ## Testing
@@ -179,9 +198,9 @@ At a glance:
 pytest
 ```
 
-70 tests, two kinds:
+83 tests, two kinds:
 
-- **Unit-style** (`tests/`) — service, route, presenter, and bot-service logic, tested by calling functions directly with mocked dependencies. Fast, and precise about which unit is broken when one fails.
+- **Unit-style** (`tests/`) — service, route, presenter, middleware, and bot-service logic, tested by calling functions directly with mocked dependencies. Fast, and precise about which unit is broken when one fails.
 - **Integration** (`tests/integration/`) — real HTTP requests through the actual FastAPI app (`httpx`/`TestClient`) against an isolated in-memory SQLite database created fresh per test. Covers the full login → refresh (rotation + reuse-detection) → logout flow, protected-route access control, and service-token enforcement — the things that only break at the wiring level, not inside any single function.
 
 ## Extending & scaling
@@ -194,13 +213,14 @@ pytest
 
 **Swapping infrastructure**: Postgres, the JWT secret, and the service token are all just environment variables — pointing `DATABASE_URL` at a managed database (RDS, Cloud SQL, etc.) instead of the bundled container requires no code changes.
 
-**Building the React admin panel**: the backend is already shaped for it. CORS is configured with `allow_credentials=True` for a browser client; refresh tokens are already delivered as httpOnly cookies (not accessible to JS, so an XSS bug can't steal a long-lived session); `GET /admins/` (JWT-protected, distinct from the bot's service-token-protected `GET /admins/active`) exists specifically so an admin panel can list accounts, not just create them blindly.
+**Adding a new page to the panel**: a page under `admin-panel/src/pages/` that uses `useApiFetch()` for requests (the interceptor adds `Authorization` and handles token expiry on its own) and `useAuth()` for the current session. Register the route in `App.tsx` inside `ProtectedRoute`, add a link in the `Layout.tsx` sidebar. Neither auth nor 401 handling needs reinventing — that's already shared infrastructure.
 
 ## Roadmap
 
-- [ ] React + TypeScript admin panel (backend auth/CORS already in place for it)
+- [ ] Rate limiting on `POST /auth/login/` — nothing currently stops unlimited password-guessing attempts
+- [ ] `secure=True` on the refresh-token cookie once deployed behind HTTPS (currently just `httponly`+`samesite=lax`, which is correct for local HTTP development)
 - [ ] Pagination on list endpoints (not yet needed at current data volume)
-- [ ] Dedicated test coverage for the bot's aiogram middleware and admin-service layer (currently verified manually, not by an automated suite)
+- [ ] Archiving closed requests instead of hard-deleting them — a separate archive table so `user`/`request` can be cleaned up without losing history (not yet designed)
 
 ## License
 
