@@ -1,10 +1,9 @@
 import { render, screen } from '@testing-library/react'
 import {userEvent} from '@testing-library/user-event'
-import { it, expect } from 'vitest'
+import { it, expect, vi } from 'vitest'
 import { MemoryRouter } from 'react-router-dom'
 import { AuthProvider } from '../auth/AuthContext'
 import LoginPage from '../pages/LoginPage'
-import { vi } from 'vitest'
 
 it('рендерит поля логина и пароля', () => {
     render(<AuthProvider>
@@ -29,8 +28,6 @@ it('печать в поле логина обновляет его значен
     await user.type(loginInput, 'admin')
     expect(loginInput).toHaveValue("admin")
 })
-
-
 it('неудачный логин не прошёл', async () =>{
     globalThis.fetch = vi.fn().mockResolvedValue({
         ok: false,
