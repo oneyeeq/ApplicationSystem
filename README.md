@@ -170,7 +170,7 @@ npm run dev
 | `SERVICE_TOKEN` | общий секрет, который бот предъявляет API (заголовок `X-Service-Token`) |
 | `CORS_ALLOWED_ORIGINS` | JSON-список источников, которым разрешено обращаться к API с credentials (для будущей веб-панели) |
 | `MAX_ACTIVE_REQUESTS` | сколько открытых заявок может быть у одного пользователя одновременно |
-| `COMPLETED_REQUEST_RETENTION_DAYS`, `CLEANUP_INTERVAL_SECONDS` | поведение планировщика |
+| `REQUEST_STALE_DAYS`, `CLEANUP_INTERVAL_SECONDS` | поведение планировщика |
 
 Генерация секретов:
 ```bash

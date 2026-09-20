@@ -3,7 +3,7 @@ from unittest.mock import AsyncMock, MagicMock
 from scheduler.jobs import cleanup
 
 
-async def test_scheduler_job_opens_session_and_returns_deleted_count(monkeypatch):
+async def test_scheduler_job_opens_session_and_returns_archived_count(monkeypatch):
     session = AsyncMock()
     session_factory = MagicMock()
     session_factory.return_value.__aenter__.return_value = session
@@ -12,11 +12,11 @@ async def test_scheduler_job_opens_session_and_returns_deleted_count(monkeypatch
     monkeypatch.setattr(cleanup, "session_factory", session_factory)
     monkeypatch.setattr(
         cleanup,
-        "delete_expired_closed_requests",
+        "archive_stale_requests",
         AsyncMock(return_value=4),
     )
 
-    result = await cleanup.cleanup_closed_requests()
+    result = await cleanup.archive_stale_requests_job()
 
     assert result == 4
     session_factory.assert_called_once_with()

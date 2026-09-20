@@ -6,13 +6,13 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 class Settings(BaseSettings):
     # Telegram Bot
     BOT_TOKEN: str
-    
+
     # Database
     DATABASE_URL: str
 
-    #Time
+    # Time
     TIMEZONE: str
-    
+
     # API
     API_HOST: str = "0.0.0.0"
     API_PORT: int = 8000
@@ -23,8 +23,8 @@ class Settings(BaseSettings):
 
     # Scheduler
     CLEANUP_INTERVAL_SECONDS: int = 3600
-    COMPLETED_REQUEST_RETENTION_DAYS: int = 30
-    
+    REQUEST_STALE_DAYS: int = 30
+
     # Environment
     DEBUG: bool = False
 

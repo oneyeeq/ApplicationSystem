@@ -170,7 +170,7 @@ All settings are read from environment variables (`config.py`, via `pydantic-set
 | `SERVICE_TOKEN` | Shared secret the bot presents to the API (`X-Service-Token` header) |
 | `CORS_ALLOWED_ORIGINS` | JSON list of origins allowed to call the API with credentials (for the future web panel) |
 | `MAX_ACTIVE_REQUESTS` | How many open requests one user can have at once |
-| `COMPLETED_REQUEST_RETENTION_DAYS`, `CLEANUP_INTERVAL_SECONDS` | Scheduler behavior |
+| `REQUEST_STALE_DAYS`, `CLEANUP_INTERVAL_SECONDS` | Scheduler behavior |
 
 Generate secrets with:
 ```bash

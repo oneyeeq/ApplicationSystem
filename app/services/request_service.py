@@ -1,18 +1,19 @@
 from datetime import datetime
 
-from sqlalchemy import delete, select, update
+from sqlalchemy import select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.models.request_archive_model import ArchivedRequest
 from app.models.request_model import Request, StatusEnum
 from app.models.user_model import User
 from app.schemas.request_schemas import RequestCreate, RequestUpdate
 from app.services.exceptions import (
     ActiveRequestLimitError,
     InactiveUserError,
-    RequestNotFoundError,
-    UserNotFoundError,
     RequestAlreadyClosedError,
+    RequestNotFoundError,
     RequestTransitionNotAllowedError,
+    UserNotFoundError,
 )
 from config import settings
 
@@ -30,6 +31,7 @@ ALLOWED_TRANSITIONS = {
     (StatusEnum.IN_PROGRESS, StatusEnum.COMPLETED),
     (StatusEnum.IN_PROGRESS, StatusEnum.REJECTED),
 }
+
 
 async def create_request(
     db: AsyncSession,
@@ -55,9 +57,7 @@ async def create_request(
 
 
 async def list_requests(db: AsyncSession) -> list[Request]:
-    result = await db.execute(
-        select(Request).order_by(Request.created_at.asc(), Request.id.asc())
-    )
+    result = await db.execute(select(Request).order_by(Request.created_at.asc(), Request.id.asc()))
     return list(result.scalars().all())
 
 
@@ -115,21 +115,33 @@ async def delete_request(db: AsyncSession, request_id: int) -> None:
     await db.commit()
 
 
-async def delete_expired_closed_requests(
+async def archive_stale_requests(
     db: AsyncSession,
     older_than: datetime,
 ) -> int:
-    result = await db.execute(
-        delete(Request).where(
-            Request.status.in_(CLOSED_STATUSES),
+    results = await db.execute(
+        select(Request).where(
             Request.updated_at < older_than,
         )
     )
+    requests = list(results.scalars().all())
+    for request in requests:
+        archived_request = ArchivedRequest(
+            original_request_id=request.id,
+            service_name=request.service_name,
+            phone_number=request.phone_number,
+            status=request.status,
+            created_at=request.created_at,
+            updated_at=request.updated_at,
+        )
+        db.add(archived_request)
+        await db.delete(request)
     await db.commit()
-    return result.rowcount or 0
+    return len(requests)
 
 
 # -- Helpers --
+
 
 async def _get_user_by_telegram_id(db: AsyncSession, telegram_id: int) -> User:
     result = await db.execute(select(User).where(User.tg_user_id == telegram_id))
@@ -150,8 +162,10 @@ def _validate_user_active(user: User) -> None:
     if not user.is_active:
         raise InactiveUserError("Пользователь заблокирован")
 
+
 def has_reached_active_limit(user: User) -> bool:
     return user.active_requests >= settings.MAX_ACTIVE_REQUESTS
+
 
 def _is_status_transition(
     old: StatusEnum,

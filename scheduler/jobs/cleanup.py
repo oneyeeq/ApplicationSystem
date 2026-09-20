@@ -1,19 +1,19 @@
-from datetime import datetime, timedelta, timezone
 import logging
+from datetime import datetime, timedelta, timezone
 
 from app.database import session_factory
-from app.services.request_service import delete_expired_closed_requests
+from app.services.request_service import archive_stale_requests
 from config import settings
 
 logger = logging.getLogger(__name__)
 
 
-async def cleanup_closed_requests() -> int:
+async def archive_stale_requests_job() -> int:
     cutoff = datetime.now(timezone.utc).replace(tzinfo=None) - timedelta(
-        days=settings.COMPLETED_REQUEST_RETENTION_DAYS
+        days=settings.REQUEST_STALE_DAYS
     )
     async with session_factory() as db:
-        deleted_count = await delete_expired_closed_requests(db, cutoff)
+        archived_count = await archive_stale_requests(db, cutoff)
 
-    logger.info("Удалено закрытых заявок: %s", deleted_count)
-    return deleted_count
+    logger.info("Заархивировано заявок: %s", archived_count)
+    return archived_count
