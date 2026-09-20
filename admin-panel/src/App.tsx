@@ -28,7 +28,7 @@ function App() {
     }
   }
   restoreSession()
-}, [])
+}, [setToken])
   if (isCheckingAuth) {
     return (
       <div style={{ display: 'flex', minHeight: '100vh', alignItems: 'center', justifyContent: 'center' }}>
