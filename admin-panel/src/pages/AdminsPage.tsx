@@ -19,7 +19,7 @@ interface PaginatedAdmins {
   page_size: number
 }
 
-const PAGE_SIZE = 20
+const PAGE_SIZE = 10
 
 function AdminsPage() {
   const { token } = useAuth()

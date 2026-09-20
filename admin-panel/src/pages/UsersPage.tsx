@@ -19,7 +19,7 @@ interface PaginatedUsers {
   page_size: number
 }
 
-const PAGE_SIZE = 20
+const PAGE_SIZE = 10
 
 function UsersPage() {
   const { token } = useAuth()

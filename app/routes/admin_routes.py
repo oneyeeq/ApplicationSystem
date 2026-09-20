@@ -52,7 +52,7 @@ async def list_admins(
 @router.get("/admins/paginated", response_model=PaginatedResponse[AdminResponse])
 async def get_admins_paginated(
     page: int = Query(1, ge=1),
-    page_size: int = Query(20, ge=1, le=100),
+    page_size: int = Query(10, ge=1, le=100),
     db: AsyncSession = Depends(get_db),
     admin: Admin = Depends(get_current_admin),
 ):

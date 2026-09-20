@@ -31,7 +31,7 @@ async def get_users(db: DbSession):
 async def get_users_paginated(
     db: DbSession,
     page: int = Query(1, ge=1),
-    page_size: int = Query(20, ge=1, le=100),
+    page_size: int = Query(10, ge=1, le=100),
 ):
     items, total = await user_service.list_users_paginated(db, page, page_size)
     return PaginatedResponse(items=items, total=total, page=page, page_size=page_size)

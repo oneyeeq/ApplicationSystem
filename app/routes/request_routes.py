@@ -46,7 +46,7 @@ async def get_requests(db: AsyncSession = Depends(get_db)):
 @router.get("/requests/paginated", response_model=PaginatedResponse[RequestResponse])
 async def get_requests_paginated(
     page: int = Query(1, ge=1),
-    page_size: int = Query(20, ge=1, le=100),
+    page_size: int = Query(10, ge=1, le=100),
     db: AsyncSession = Depends(get_db),
 ):
     items, total = await request_service.list_requests_paginated(db, page, page_size)

@@ -27,7 +27,7 @@ interface PaginatedRequests {
   page_size: number
 }
 
-const PAGE_SIZE = 20
+const PAGE_SIZE = 10
 
 function RequestsPage() {
   const [requests, setRequests] = useState<RequestItem[]>([])
