@@ -3,12 +3,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database import get_db
 from app.dependencies.service_or_admin_auth import verify_service_token_or_admin
-from app.schemas.request_schemas import (
-    PaginatedRequestsResponse,
-    RequestCreate,
-    RequestResponse,
-    RequestUpdate,
-)
+from app.schemas.pagination import PaginatedResponse
+from app.schemas.request_schemas import RequestCreate, RequestResponse, RequestUpdate
 from app.services import request_service
 from app.services.exceptions import (
     ActiveRequestLimitError,
@@ -47,14 +43,14 @@ async def get_requests(db: AsyncSession = Depends(get_db)):
     return await request_service.list_requests(db)
 
 
-@router.get("/requests/paginated", response_model=PaginatedRequestsResponse)
+@router.get("/requests/paginated", response_model=PaginatedResponse[RequestResponse])
 async def get_requests_paginated(
     page: int = Query(1, ge=1),
     page_size: int = Query(20, ge=1, le=100),
     db: AsyncSession = Depends(get_db),
 ):
     items, total = await request_service.list_requests_paginated(db, page, page_size)
-    return PaginatedRequestsResponse(items=items, total=total, page=page, page_size=page_size)
+    return PaginatedResponse(items=items, total=total, page=page, page_size=page_size)
 
 
 @router.get("/requests/by-telegram/{telegram_id}", response_model=list[RequestResponse])

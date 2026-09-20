@@ -117,3 +117,17 @@ async def test_admin_service_blocks_self_delete(db_session):
 
     with pytest.raises(AdminSelfDeleteError):
         await admin_service.delete_admin(db_session, admin.id, acting_admin_id=admin.id)
+
+
+async def test_get_admins_paginated_orders_newest_first_and_reports_total(db_session):
+    for i in range(3):
+        await admin_service.create_admin(
+            AdminCreate(login=f"paged_admin_{i}", password="already-hashed"),
+            db_session,
+        )
+
+    items, total = await admin_service.get_admins_paginated(db_session, page=1, page_size=2)
+
+    assert total == 3
+    assert len(items) == 2
+    assert items[0].login == "paged_admin_2"

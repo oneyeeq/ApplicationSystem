@@ -1,4 +1,4 @@
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -48,6 +48,19 @@ async def get_admins(db: AsyncSession) -> list[Admin]:
     result = await db.execute(select(Admin))
     admins = list(result.scalars().all())
     return admins
+
+
+async def get_admins_paginated(
+    db: AsyncSession,
+    page: int,
+    page_size: int,
+) -> tuple[list[Admin], int]:
+    total = await db.scalar(select(func.count()).select_from(Admin))
+
+    result = await db.execute(
+        select(Admin).order_by(Admin.id.desc()).offset((page - 1) * page_size).limit(page_size)
+    )
+    return list(result.scalars().all()), total or 0
 
 
 async def get_admin_by_id(db: AsyncSession, admin_id: int) -> Admin:

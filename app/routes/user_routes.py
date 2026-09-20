@@ -1,10 +1,11 @@
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database import get_db
 from app.dependencies.service_or_admin_auth import verify_service_token_or_admin
+from app.schemas.pagination import PaginatedResponse
 from app.schemas.user_schemas import UserCreate, UserResponse, UserUpdate
 from app.services import user_service
 from app.services.exceptions import UserAlreadyExistsError, UserHasRequestsError, UserNotFoundError
@@ -24,6 +25,16 @@ async def check_user_by_tg_id(telegram_id: int, db: DbSession):
 @router.get("/users/", response_model=list[UserResponse])
 async def get_users(db: DbSession):
     return await user_service.list_users(db)
+
+
+@router.get("/users/paginated", response_model=PaginatedResponse[UserResponse])
+async def get_users_paginated(
+    db: DbSession,
+    page: int = Query(1, ge=1),
+    page_size: int = Query(20, ge=1, le=100),
+):
+    items, total = await user_service.list_users_paginated(db, page, page_size)
+    return PaginatedResponse(items=items, total=total, page=page, page_size=page_size)
 
 
 @router.get("/users/{user_id}", response_model=UserResponse)

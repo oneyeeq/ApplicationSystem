@@ -1,4 +1,4 @@
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -27,6 +27,22 @@ async def get_user_by_id(db: AsyncSession, user_id: int) -> User:
 async def list_users(db: AsyncSession) -> list[User]:
     result = await db.execute(select(User))
     return list(result.scalars().all())
+
+
+async def list_users_paginated(
+    db: AsyncSession,
+    page: int,
+    page_size: int,
+) -> tuple[list[User], int]:
+    total = await db.scalar(select(func.count()).select_from(User))
+
+    result = await db.execute(
+        select(User)
+        .order_by(User.created_at.desc(), User.id.desc())
+        .offset((page - 1) * page_size)
+        .limit(page_size)
+    )
+    return list(result.scalars().all()), total or 0
 
 
 async def create_user(db: AsyncSession, user_data: UserCreate) -> User:

@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database import get_db
@@ -11,6 +11,7 @@ from app.schemas.admin_schemas import (
     AdminResponse,
     AdminUpdate,
 )
+from app.schemas.pagination import PaginatedResponse
 from app.services import admin_service
 from app.services.exceptions import (
     AdminAlreadyExistsError,
@@ -46,6 +47,17 @@ async def list_admins(
     admin: Admin = Depends(get_current_admin),
 ):
     return await admin_service.get_admins(db)
+
+
+@router.get("/admins/paginated", response_model=PaginatedResponse[AdminResponse])
+async def get_admins_paginated(
+    page: int = Query(1, ge=1),
+    page_size: int = Query(20, ge=1, le=100),
+    db: AsyncSession = Depends(get_db),
+    admin: Admin = Depends(get_current_admin),
+):
+    items, total = await admin_service.get_admins_paginated(db, page, page_size)
+    return PaginatedResponse(items=items, total=total, page=page, page_size=page_size)
 
 
 @router.put("/admins/{admin_id}", response_model=AdminResponse)

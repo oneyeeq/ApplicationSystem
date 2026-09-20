@@ -74,3 +74,15 @@ async def test_delete_user_blocked_when_user_has_requests(db_session):
 
     with pytest.raises(UserHasRequestsError):
         await user_service.delete_user(db_session, user.id)
+
+
+async def test_list_users_paginated_orders_newest_first_and_reports_total(db_session):
+    for i in range(3):
+        db_session.add(User(tg_user_id=2100 + i, username=f"user_{i}"))
+    await db_session.commit()
+
+    items, total = await user_service.list_users_paginated(db_session, page=1, page_size=2)
+
+    assert total == 3
+    assert len(items) == 2
+    assert items[0].tg_user_id == 2102
