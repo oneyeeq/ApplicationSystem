@@ -21,4 +21,5 @@ function useAuth() {
 }
 
 
-export { AuthProvider, useAuth }
+export { AuthContext, AuthProvider, useAuth }
+
