@@ -231,4 +231,4 @@ Both suites run automatically on every push and pull request in GitHub Actions, 
 
 ## License
 
-Not yet decided — pick one before treating this as open source (MIT is the common default for portfolio projects; something more restrictive if you intend to keep commercial rights).
+All rights reserved (see [LICENSE](LICENSE)). The code is public on GitHub for review and portfolio purposes; using, copying, modifying, or commercially exploiting it requires the author's written permission.
