@@ -45,23 +45,29 @@ def admin_menu_keyboard() -> InlineKeyboardMarkup:
     )
 
 
-def admin_notification_request_keyboard(
-    request_id: int,
-    include_back_to_menu: bool = True,
-) -> InlineKeyboardMarkup:
-    keyboard = [
-        [
-            InlineKeyboardButton(
-                text="Принять",
-                callback_data=f"take_notification_request:{request_id}",
-            ),
-            InlineKeyboardButton(
-                text="Отклонить",
-                callback_data=f"reject_notification_request:{request_id}",
-            ),
-        ]
+def _action_row(
+    primary_text: str,
+    primary_callback: str,
+    secondary_text: str,
+    secondary_callback: str,
+) -> list[InlineKeyboardButton]:
+    return [
+        InlineKeyboardButton(text=primary_text, callback_data=primary_callback),
+        InlineKeyboardButton(text=secondary_text, callback_data=secondary_callback),
     ]
 
+
+def _nav_row(previous_callback: str, next_callback: str) -> list[InlineKeyboardButton]:
+    return [
+        InlineKeyboardButton(text="Предыдущая", callback_data=previous_callback),
+        InlineKeyboardButton(text="Следующая", callback_data=next_callback),
+    ]
+
+
+def _with_back_to_menu(
+    keyboard: list[list[InlineKeyboardButton]],
+    include_back_to_menu: bool,
+) -> InlineKeyboardMarkup:
     if include_back_to_menu:
         keyboard.append(
             [
@@ -73,6 +79,21 @@ def admin_notification_request_keyboard(
         )
 
     return InlineKeyboardMarkup(inline_keyboard=keyboard)
+
+
+def admin_notification_request_keyboard(
+    request_id: int,
+    include_back_to_menu: bool = True,
+) -> InlineKeyboardMarkup:
+    keyboard = [
+        _action_row(
+            "Принять",
+            f"take_notification_request:{request_id}",
+            "Отклонить",
+            f"reject_notification_request:{request_id}",
+        ),
+    ]
+    return _with_back_to_menu(keyboard, include_back_to_menu)
 
 
 def admin_new_request_keyboard(
@@ -80,41 +101,15 @@ def admin_new_request_keyboard(
     include_back_to_menu: bool = True,
 ) -> InlineKeyboardMarkup:
     keyboard = [
-        [
-            InlineKeyboardButton(
-                text="Принять",
-                callback_data=f"take_request:{request_id}",
-            ),
-            InlineKeyboardButton(
-                text="Отклонить",
-                callback_data=f"reject_new_request:{request_id}",
-            ),
-        ],
-        [
-            InlineKeyboardButton(
-                text="Предыдущая",
-                callback_data=f"previous_new_request:{request_id}",
-            ),
-            InlineKeyboardButton(
-                text="Следующая",
-                callback_data=f"next_new_request:{request_id}",
-            ),
-        ],
+        _action_row(
+            "Принять",
+            f"take_request:{request_id}",
+            "Отклонить",
+            f"reject_new_request:{request_id}",
+        ),
+        _nav_row(f"previous_new_request:{request_id}", f"next_new_request:{request_id}"),
     ]
-
-    if include_back_to_menu:
-        keyboard.append(
-            [
-                InlineKeyboardButton(
-                    text="Вернуться в меню",
-                    callback_data="admin_back_to_menu",
-                )
-            ]
-        )
-
-    return InlineKeyboardMarkup(
-        inline_keyboard=keyboard,
-    )
+    return _with_back_to_menu(keyboard, include_back_to_menu)
 
 
 def admin_in_progress_request_keyboard(
@@ -122,41 +117,15 @@ def admin_in_progress_request_keyboard(
     include_back_to_menu: bool = True,
 ) -> InlineKeyboardMarkup:
     keyboard = [
-        [
-            InlineKeyboardButton(
-                text="Завершить",
-                callback_data=f"complete_request:{request_id}",
-            ),
-            InlineKeyboardButton(
-                text="Отклонить",
-                callback_data=f"reject_in_progress_request:{request_id}",
-            ),
-        ],
-        [
-            InlineKeyboardButton(
-                text="Предыдущая",
-                callback_data=f"previous_in_progress:{request_id}",
-            ),
-            InlineKeyboardButton(
-                text="Следующая",
-                callback_data=f"next_in_progress:{request_id}",
-            ),
-        ],
+        _action_row(
+            "Завершить",
+            f"complete_request:{request_id}",
+            "Отклонить",
+            f"reject_in_progress_request:{request_id}",
+        ),
+        _nav_row(f"previous_in_progress:{request_id}", f"next_in_progress:{request_id}"),
     ]
-
-    if include_back_to_menu:
-        keyboard.append(
-            [
-                InlineKeyboardButton(
-                    text="Вернуться в меню",
-                    callback_data="admin_back_to_menu",
-                )
-            ]
-        )
-
-    return InlineKeyboardMarkup(
-        inline_keyboard=keyboard,
-    )
+    return _with_back_to_menu(keyboard, include_back_to_menu)
 
 
 def admin_today_in_progress_request_keyboard(
@@ -164,41 +133,15 @@ def admin_today_in_progress_request_keyboard(
     include_back_to_menu: bool = True,
 ) -> InlineKeyboardMarkup:
     keyboard = [
-        [
-            InlineKeyboardButton(
-                text="Завершить",
-                callback_data=f"complete_today_request:{request_id}",
-            ),
-            InlineKeyboardButton(
-                text="Отклонить",
-                callback_data=f"reject_today_request:{request_id}",
-            ),
-        ],
-        [
-            InlineKeyboardButton(
-                text="Предыдущая",
-                callback_data=f"previous_today_request:{request_id}",
-            ),
-            InlineKeyboardButton(
-                text="Следующая",
-                callback_data=f"next_today_request:{request_id}",
-            ),
-        ],
+        _action_row(
+            "Завершить",
+            f"complete_today_request:{request_id}",
+            "Отклонить",
+            f"reject_today_request:{request_id}",
+        ),
+        _nav_row(f"previous_today_request:{request_id}", f"next_today_request:{request_id}"),
     ]
-
-    if include_back_to_menu:
-        keyboard.append(
-            [
-                InlineKeyboardButton(
-                    text="Вернуться в меню",
-                    callback_data="admin_back_to_menu",
-                )
-            ]
-        )
-
-    return InlineKeyboardMarkup(
-        inline_keyboard=keyboard,
-    )
+    return _with_back_to_menu(keyboard, include_back_to_menu)
 
 
 def admin_today_new_request_keyboard(
@@ -206,39 +149,15 @@ def admin_today_new_request_keyboard(
     include_back_to_menu: bool = True,
 ) -> InlineKeyboardMarkup:
     keyboard = [
-        [
-            InlineKeyboardButton(
-                text="Принять",
-                callback_data=f"take_today_request:{request_id}",
-            ),
-            InlineKeyboardButton(
-                text="Отклонить",
-                callback_data=f"reject_today_request:{request_id}",
-            ),
-        ],
-        [
-            InlineKeyboardButton(
-                text="Предыдущая",
-                callback_data=f"previous_today_request:{request_id}",
-            ),
-            InlineKeyboardButton(
-                text="Следующая",
-                callback_data=f"next_today_request:{request_id}",
-            ),
-        ],
+        _action_row(
+            "Принять",
+            f"take_today_request:{request_id}",
+            "Отклонить",
+            f"reject_today_request:{request_id}",
+        ),
+        _nav_row(f"previous_today_request:{request_id}", f"next_today_request:{request_id}"),
     ]
-
-    if include_back_to_menu:
-        keyboard.append(
-            [
-                InlineKeyboardButton(
-                    text="Вернуться в меню",
-                    callback_data="admin_back_to_menu",
-                )
-            ]
-        )
-
-    return InlineKeyboardMarkup(inline_keyboard=keyboard)
+    return _with_back_to_menu(keyboard, include_back_to_menu)
 
 
 def admin_today_closed_request_keyboard(
@@ -246,26 +165,6 @@ def admin_today_closed_request_keyboard(
     include_back_to_menu: bool = True,
 ) -> InlineKeyboardMarkup:
     keyboard = [
-        [
-            InlineKeyboardButton(
-                text="Предыдущая",
-                callback_data=f"previous_today_request:{request_id}",
-            ),
-            InlineKeyboardButton(
-                text="Следующая",
-                callback_data=f"next_today_request:{request_id}",
-            ),
-        ]
+        _nav_row(f"previous_today_request:{request_id}", f"next_today_request:{request_id}"),
     ]
-
-    if include_back_to_menu:
-        keyboard.append(
-            [
-                InlineKeyboardButton(
-                    text="Вернуться в меню",
-                    callback_data="admin_back_to_menu",
-                )
-            ]
-        )
-
-    return InlineKeyboardMarkup(inline_keyboard=keyboard)
+    return _with_back_to_menu(keyboard, include_back_to_menu)
