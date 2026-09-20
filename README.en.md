@@ -123,7 +123,7 @@ cp .env.example .env
 docker compose up --build
 ```
 
-This starts Postgres, the API (migrations run automatically on startup), the bot, and the scheduler — four containers, one command. The API is available at `http://localhost:8000` (`/docs` for interactive OpenAPI docs).
+This starts Postgres, the API (migrations run automatically on startup), the bot, the scheduler, and the web panel — five containers, one command. The API is available at `http://localhost:8000` (`/docs` for interactive OpenAPI docs), the panel at `http://localhost:5173`. The panel is built to static files (`npm run build`) and served by `nginx`, not the dev server — like the other services, it ships in its built form, not in development mode.
 
 ### Local development
 
@@ -145,7 +145,9 @@ uvicorn app.main:app --reload
 python -m scheduler.main
 ```
 
-### Web panel (React)
+### Web panel (React) — developing the panel itself
+
+If you actually want to edit the panel's code (not just use the built one), Docker gets in the way — the built image has no hot reload, unlike Vite's dev server. To develop the panel outside Docker:
 
 ```bash
 cd admin-panel
@@ -153,7 +155,7 @@ npm install
 npm run dev
 ```
 
-Comes up on `http://localhost:5173` and talks to the API on `http://localhost:8000`. Make sure the backend is already running (see above) and that `CORS_ALLOWED_ORIGINS` in `.env` includes `http://localhost:5173` (it does by default). The panel isn't wired into `docker-compose.yml` — it runs separately via the Vite dev server.
+Comes up on `http://localhost:5173` (the same port the container uses — don't run both at once) and talks to the API on `http://localhost:8000`. Make sure `CORS_ALLOWED_ORIGINS` in `.env` includes `http://localhost:5173` (it does by default).
 
 ## Configuration
 
