@@ -20,7 +20,7 @@ async def test_middleware_rejects_non_admin_callback(monkeypatch):
     event.from_user.id = 111
     data = {"api_client": AsyncMock()}
 
-    result = await middleware(handler, event, data)
+    await middleware(handler, event, data)
 
     assert handler.called is False
     event.answer.assert_awaited_once_with("Доступ запрещён", show_alert=True)
@@ -40,7 +40,7 @@ async def test_middleware_rejects_non_admin_message(monkeypatch):
     event.from_user.id = 111
     data = {"api_client": AsyncMock()}
 
-    result = await middleware(handler, event, data)
+    await middleware(handler, event, data)
 
     assert handler.called is False
     event.answer.assert_awaited_once_with("Доступ запрещён")
