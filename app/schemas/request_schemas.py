@@ -24,3 +24,10 @@ class RequestResponse(BaseModel):
     status: StatusEnum
     created_at: datetime
     updated_at: datetime
+
+
+class PaginatedRequestsResponse(BaseModel):
+    items: list[RequestResponse]
+    total: int
+    page: int
+    page_size: int

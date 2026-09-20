@@ -1,6 +1,6 @@
 from datetime import datetime
 
-from sqlalchemy import select, update
+from sqlalchemy import func, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.request_archive_model import ArchivedRequest
@@ -59,6 +59,22 @@ async def create_request(
 async def list_requests(db: AsyncSession) -> list[Request]:
     result = await db.execute(select(Request).order_by(Request.created_at.asc(), Request.id.asc()))
     return list(result.scalars().all())
+
+
+async def list_requests_paginated(
+    db: AsyncSession,
+    page: int,
+    page_size: int,
+) -> tuple[list[Request], int]:
+    total = await db.scalar(select(func.count()).select_from(Request))
+
+    result = await db.execute(
+        select(Request)
+        .order_by(Request.created_at.desc(), Request.id.desc())
+        .offset((page - 1) * page_size)
+        .limit(page_size)
+    )
+    return list(result.scalars().all()), total or 0
 
 
 async def list_user_requests(

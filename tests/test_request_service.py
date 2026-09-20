@@ -11,6 +11,7 @@ from app.services.exceptions import ActiveRequestLimitError
 from app.services.request_service import (
     archive_stale_requests,
     create_request,
+    list_requests_paginated,
     update_request,
 )
 from config import settings
@@ -145,3 +146,62 @@ async def test_create_request_rejects_when_limit_reached(db_session):
     # when it correctly matched 0 rows
     result = await db_session.execute(select(Request).where(Request.user_id == user.id))
     assert result.scalars().all() == []
+
+
+async def test_list_requests_paginated_orders_newest_first_and_reports_total(db_session):
+    user = User(tg_user_id=1005)
+    db_session.add(user)
+    await db_session.flush()
+
+    base_time = datetime.now()
+    requests = [
+        Request(
+            service_name=f"Услуга {i}",
+            phone_number=f"+2000000000{i}",
+            user_id=user.id,
+            status=StatusEnum.NEW,
+            created_at=base_time + timedelta(minutes=i),
+            updated_at=base_time + timedelta(minutes=i),
+        )
+        for i in range(5)
+    ]
+    db_session.add_all(requests)
+    await db_session.commit()
+
+    items, total = await list_requests_paginated(db_session, page=1, page_size=2)
+
+    assert total == 5
+    assert [r.service_name for r in items] == ["Услуга 4", "Услуга 3"]
+
+
+async def test_list_requests_paginated_returns_remaining_items_on_last_page(db_session):
+    user = User(tg_user_id=1006)
+    db_session.add(user)
+    await db_session.flush()
+
+    base_time = datetime.now()
+    requests = [
+        Request(
+            service_name=f"Услуга {i}",
+            phone_number=f"+3000000000{i}",
+            user_id=user.id,
+            status=StatusEnum.NEW,
+            created_at=base_time + timedelta(minutes=i),
+            updated_at=base_time + timedelta(minutes=i),
+        )
+        for i in range(5)
+    ]
+    db_session.add_all(requests)
+    await db_session.commit()
+
+    items, total = await list_requests_paginated(db_session, page=3, page_size=2)
+
+    assert total == 5
+    assert [r.service_name for r in items] == ["Услуга 0"]
+
+
+async def test_list_requests_paginated_empty_table(db_session):
+    items, total = await list_requests_paginated(db_session, page=1, page_size=20)
+
+    assert items == []
+    assert total == 0
