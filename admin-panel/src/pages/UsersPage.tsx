@@ -12,23 +12,38 @@ interface UserItem {
   active_requests: number
 }
 
+interface PaginatedUsers {
+  items: UserItem[]
+  total: number
+  page: number
+  page_size: number
+}
+
+const PAGE_SIZE = 20
+
 function UsersPage() {
   const { token } = useAuth()
   const apiFetch = useApiFetch()
   const [users, setUsers] = useState<UserItem[]>([])
+  const [page, setPage] = useState(1)
+  const [total, setTotal] = useState(0)
   const [errorMessage, setErrorMessage] = useState('')
 
-  useEffect(() => {
-    async function loadUsers() {
-      const response = await apiFetch('/users/')
-      const data = await response.json()
-      if (response.ok) {
-        setUsers(data)
-      }
+  async function loadUsers() {
+    const response = await apiFetch(`/users/paginated?page=${page}&page_size=${PAGE_SIZE}`)
+    const data: PaginatedUsers = await response.json()
+    if (response.ok) {
+      setUsers(data.items)
+      setTotal(data.total)
     }
+  }
+
+  useEffect(() => {
     loadUsers()
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [token])
+  }, [token, page])
+
+  const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE))
 
   async function handleToggleActive(userId: number, newIsActive: boolean) {
     const response = await apiFetch(`/users/${userId}`, {
@@ -45,7 +60,7 @@ function UsersPage() {
   async function handleDeleteUser(userId: number) {
     const response = await apiFetch(`/users/${userId}`, { method: 'DELETE' })
     if (response.ok) {
-      setUsers(users.filter((u) => u.id !== userId))
+      await loadUsers()
       setErrorMessage('')
     } else {
       const data = await response.json()
@@ -91,6 +106,17 @@ function UsersPage() {
             ))}
           </tbody>
         </table>
+      </div>
+      <div className={tableStyles.pagination}>
+        <button disabled={page <= 1} onClick={() => setPage((p) => p - 1)}>
+          ← Назад
+        </button>
+        <span className={tableStyles.pageInfo}>
+          Стр. {page} из {totalPages}
+        </span>
+        <button disabled={page >= totalPages} onClick={() => setPage((p) => p + 1)}>
+          Вперёд →
+        </button>
       </div>
       {errorMessage && <p className={styles.error}>{errorMessage}</p>}
     </>

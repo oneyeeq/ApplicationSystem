@@ -66,6 +66,15 @@ button:hover {
   background: var(--border);
 }
 
+button:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+button:disabled:hover {
+  background: var(--bg-hover);
+}
+
 button.primary {
   color: #fff;
   background: var(--accent);

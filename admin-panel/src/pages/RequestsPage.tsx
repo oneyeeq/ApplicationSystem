@@ -20,22 +20,37 @@ interface RequestItem {
   updated_at: string
 }
 
+interface PaginatedRequests {
+  items: RequestItem[]
+  total: number
+  page: number
+  page_size: number
+}
+
+const PAGE_SIZE = 20
+
 function RequestsPage() {
   const [requests, setRequests] = useState<RequestItem[]>([])
+  const [page, setPage] = useState(1)
+  const [total, setTotal] = useState(0)
   const { token } = useAuth()
   const apiFetch = useApiFetch()
 
-  useEffect(() => {
-    async function loadRequests() {
-      const response = await apiFetch('/requests/')
-      const data = await response.json()
-      if (response.ok) {
-        setRequests(data)
-      }
+  async function loadRequests() {
+    const response = await apiFetch(`/requests/paginated?page=${page}&page_size=${PAGE_SIZE}`)
+    const data: PaginatedRequests = await response.json()
+    if (response.ok) {
+      setRequests(data.items)
+      setTotal(data.total)
     }
+  }
+
+  useEffect(() => {
     loadRequests()
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [token])
+  }, [token, page])
+
+  const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE))
 
   async function handleStatusChange(requestId: number, newStatus: string) {
     const response = await apiFetch(`/requests/${requestId}`, {
@@ -52,7 +67,7 @@ function RequestsPage() {
   async function handleDeleteRequest(requestId: number) {
     const response = await apiFetch(`/requests/${requestId}`, { method: 'DELETE' })
     if (response.ok) {
-      setRequests(requests.filter((r) => r.id !== requestId))
+      await loadRequests()
     }
   }
 
@@ -120,6 +135,17 @@ function RequestsPage() {
             ))}
           </tbody>
         </table>
+      </div>
+      <div className={tableStyles.pagination}>
+        <button disabled={page <= 1} onClick={() => setPage((p) => p - 1)}>
+          ← Назад
+        </button>
+        <span className={tableStyles.pageInfo}>
+          Стр. {page} из {totalPages}
+        </span>
+        <button disabled={page >= totalPages} onClick={() => setPage((p) => p + 1)}>
+          Вперёд →
+        </button>
       </div>
     </>
   )

@@ -12,10 +12,21 @@ interface AdminItem {
   is_active: boolean
 }
 
+interface PaginatedAdmins {
+  items: AdminItem[]
+  total: number
+  page: number
+  page_size: number
+}
+
+const PAGE_SIZE = 20
+
 function AdminsPage() {
   const { token } = useAuth()
   const apiFetch = useApiFetch()
   const [admins, setAdmins] = useState<AdminItem[]>([])
+  const [page, setPage] = useState(1)
+  const [total, setTotal] = useState(0)
   const [login, setLogin] = useState('')
   const [password, setPassword] = useState('')
   const [tgAdminId, setTgAdminId] = useState('')
@@ -26,17 +37,21 @@ function AdminsPage() {
   const [editTgAdminId, setEditTgAdminId] = useState('')
   const [editUsername, setEditUsername] = useState('')
 
-  useEffect(() => {
-    async function loadAdmins() {
-      const response = await apiFetch('/admins/')
-      const data = await response.json()
-      if (response.ok) {
-        setAdmins(data)
-      }
+  async function loadAdmins() {
+    const response = await apiFetch(`/admins/paginated?page=${page}&page_size=${PAGE_SIZE}`)
+    const data: PaginatedAdmins = await response.json()
+    if (response.ok) {
+      setAdmins(data.items)
+      setTotal(data.total)
     }
+  }
+
+  useEffect(() => {
     loadAdmins()
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [token])
+  }, [token, page])
+
+  const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE))
 
   async function handleCreateAdmin() {
     const response = await apiFetch('/admins/', {
@@ -51,12 +66,17 @@ function AdminsPage() {
     })
     const data = await response.json()
     if (response.ok) {
-      setAdmins([...admins, data])
       setLogin('')
       setPassword('')
       setTgAdminId('')
       setUsername('')
       setErrorMessage('')
+      // new admins sort first (newest first) — jump to page 1 to see them
+      if (page === 1) {
+        await loadAdmins()
+      } else {
+        setPage(1)
+      }
     } else {
       setErrorMessage(typeof data.detail === 'string' ? data.detail : 'Некорректные данные')
     }
@@ -78,7 +98,7 @@ function AdminsPage() {
   async function handleDeleteAdmin(adminId: number) {
     const response = await apiFetch(`/admins/${adminId}`, { method: 'DELETE' })
     if (response.ok) {
-      setAdmins(admins.filter((a) => a.id !== adminId))
+      await loadAdmins()
       setErrorMessage('')
     } else {
       const data = await response.json()
@@ -174,6 +194,17 @@ function AdminsPage() {
             ))}
           </tbody>
         </table>
+      </div>
+      <div className={tableStyles.pagination}>
+        <button disabled={page <= 1} onClick={() => setPage((p) => p - 1)}>
+          ← Назад
+        </button>
+        <span className={tableStyles.pageInfo}>
+          Стр. {page} из {totalPages}
+        </span>
+        <button disabled={page >= totalPages} onClick={() => setPage((p) => p + 1)}>
+          Вперёд →
+        </button>
       </div>
 
       <div className={styles.section}>
