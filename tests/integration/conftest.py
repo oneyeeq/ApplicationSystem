@@ -11,10 +11,17 @@ from sqlalchemy.ext.asyncio import (
 
 from app.database import Base, get_db
 from app.main import app
+from app.rate_limiter import limiter
 
 
 @pytest_asyncio.fixture
 async def client() -> AsyncIterator[AsyncSession]:
+    # the limiter is a module-level singleton shared across every test in
+    # the run; without resetting it, tests calling /auth/login/ repeatedly
+    # (e.g. wrong-password cases) would start tripping the rate limit
+    # depending on test order, not on anything the test itself does.
+    limiter.reset()
+
     engine = create_async_engine("sqlite+aiosqlite:///:memory:")
 
     @event.listens_for(engine.sync_engine, "connect")

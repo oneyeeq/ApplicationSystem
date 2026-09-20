@@ -243,3 +243,26 @@ async def test_logout_revokes_token(client):
     )
     assert response_logout.status_code == 200
     assert response_refresh.status_code == 401
+
+async def test_login_rate_limited_after_five_attempts(client):
+    test_client, session_factory = client
+    async with session_factory() as session:
+        await admin_service.create_admin(
+            AdminCreate(login="admin",
+                        password="password123",
+                        tg_admin_id=None,
+                        username=None
+            ),
+            session,
+        )
+
+    statuses = [
+        test_client.post(
+            "/auth/login/",
+            json={"login": "admin", "password": "wrong-password"},
+        ).status_code
+        for _ in range(6)
+    ]
+
+    assert statuses[:5] == [401] * 5
+    assert statuses[5] == 429

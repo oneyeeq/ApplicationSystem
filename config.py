@@ -33,6 +33,10 @@ class Settings(BaseSettings):
     JWT_EXPIRE_MINUTES: int = 30
     REFRESH_TOKEN_EXPIRE_DAYS: int = 30
     SERVICE_TOKEN: str
+    # True in production (served over HTTPS) — makes the refresh_token
+    # cookie HTTPS-only. Must stay False for local dev over plain HTTP,
+    # otherwise the browser silently refuses to store the cookie at all.
+    COOKIE_SECURE: bool = False
 
     CORS_ALLOWED_ORIGINS: list[str] = ["http://localhost:5173"]
 

@@ -1,4 +1,4 @@
-from fastapi import Response, Cookie
+from fastapi import Request, Response, Cookie
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -9,6 +9,8 @@ from app.services.auth_service import (authenticate_admin,
                                        revoke_refresh_token,
                                        )
 from app.database import get_db
+from app.rate_limiter import limiter
+from config import settings
 from app.services.exceptions import (
     AdminNotFoundError,
     AdminIsNotActiveError,
@@ -20,7 +22,9 @@ from app.services.exceptions import (
 router = APIRouter()
 
 @router.post("/auth/login/", response_model=LoginResponse)
+@limiter.limit("5/minute")
 async def auth_login(
+    request: Request,
     request_data: LoginRequest,
     response: Response,
     db: AsyncSession = Depends(get_db),
@@ -35,6 +39,7 @@ async def auth_login(
             value=raw_refresh_token,
             httponly=True,
             samesite="lax",
+            secure=settings.COOKIE_SECURE,
         )
         return login_response
     except AdminNotFoundError:
@@ -59,6 +64,7 @@ async def auth_refresh(
             value=new_raw_refresh_token,
             httponly=True,
             samesite="lax",
+            secure=settings.COOKIE_SECURE,
         )
         return LoginResponse(access_token=new_access_token, token_type="bearer")
     except RefreshTokenInvalidError:
@@ -74,5 +80,10 @@ async def auth_logout(
 ):
     if refresh_token is not None:
         await revoke_refresh_token(refresh_token, db)
-    response.delete_cookie("refresh_token")
+    response.delete_cookie(
+        "refresh_token",
+        httponly=True,
+        samesite="lax",
+        secure=settings.COOKIE_SECURE,
+    )
     return {"message": "Вы вышли из системы"}
