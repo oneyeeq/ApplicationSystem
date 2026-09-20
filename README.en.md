@@ -80,8 +80,9 @@ These are the parts worth a second look if you're evaluating the code, not just 
 | Auth | JWT (`python-jose`), `scrypt` password hashing, HMAC service tokens |
 | Validation | Pydantic v2 |
 | Testing | pytest, pytest-asyncio, httpx |
-| Lint / format | ruff |
-| CI | GitHub Actions — ruff + pytest on every push and PR |
+| Web panel testing | Vitest, React Testing Library |
+| Lint / format | ruff (backend), oxlint (web panel) |
+| CI | GitHub Actions — two jobs on every push and PR: ruff + pytest (backend), oxlint + vitest + build (web panel) |
 | Runtime | Python 3.12, Docker / Docker Compose |
 | Web panel | React 19 + TypeScript, Vite, React Router, CSS Modules |
 
@@ -117,6 +118,7 @@ admin-panel/           React + TypeScript web panel (SPA, Vite)
   src/auth/              auth context, route protection
   src/components/        shared shell (sidebar, tables, ErrorBoundary)
   src/pages/             Login, Requests, Admins, Users — all three list pages are paginated
+  src/test/              Vitest + React Testing Library tests, shared setup (jest-dom, DOM cleanup between tests)
 ```
 
 ## Quickstart
@@ -206,6 +208,8 @@ Each of the three list resources (`requests`, `users`, `admins`) also has a `GET
 
 ## Testing
 
+### Backend
+
 ```bash
 pytest
 ```
@@ -215,7 +219,16 @@ pytest
 - **Unit-style** (`tests/`) — service, route, presenter, middleware, and bot-service logic, tested by calling functions directly with mocked dependencies. Fast, and precise about which unit is broken when one fails.
 - **Integration** (`tests/integration/`) — real HTTP requests through the actual FastAPI app (`httpx`/`TestClient`) against an isolated in-memory SQLite database created fresh per test. Covers the full login → refresh (rotation + reuse-detection) → logout flow, protected-route access control, service-token enforcement, and the shape of paginated responses — the things that only break at the wiring level, not inside any single function.
 
-Both suites run automatically on every push and pull request in GitHub Actions, alongside `ruff check`/`ruff format --check` — see `.github/workflows/ci.yml`.
+### Web panel
+
+```bash
+cd admin-panel
+npm run test
+```
+
+25 tests on Vitest + React Testing Library, checking user-visible behavior rather than implementation details: `LoginPage` (valid/invalid login), the `useApiFetch` hook (silent access-token refresh on a 401 and one retry), `ProtectedRoute` (redirect without a token), `ErrorBoundary` (fallback screen when a child component throws), and all three list pages — table rendering, status/active toggles, create and delete with error handling, pagination. `fetch` is stubbed by hand in every test — nothing here talks to a real backend or the network.
+
+Both suites — backend and web panel — run automatically on every push and pull request in GitHub Actions, as two parallel jobs: `ruff check`/`ruff format --check`/`pytest` and `oxlint`/`vitest`/build — see `.github/workflows/ci.yml`.
 
 ## Extending & scaling
 

@@ -80,8 +80,9 @@
 | Авторизация | JWT (`python-jose`), хеширование паролей `scrypt`, HMAC-сервисные токены |
 | Валидация | Pydantic v2 |
 | Тестирование | pytest, pytest-asyncio, httpx |
-| Линтер / форматтер | ruff |
-| CI | GitHub Actions — ruff + pytest на каждый push и PR |
+| Тестирование веб-панели | Vitest, React Testing Library |
+| Линтер / форматтер | ruff (backend), oxlint (веб-панель) |
+| CI | GitHub Actions — два job'а на каждый push и PR: ruff + pytest (backend), oxlint + vitest + сборка (веб-панель) |
 | Окружение | Python 3.12, Docker / Docker Compose |
 | Веб-панель | React 19 + TypeScript, Vite, React Router, CSS Modules |
 
@@ -117,6 +118,7 @@ admin-panel/           веб-панель на React + TypeScript (SPA, Vite)
   src/auth/              контекст авторизации, защита роутов
   src/components/        общий каркас (сайдбар, таблицы, ErrorBoundary)
   src/pages/             Вход, Заявки, Админы, Пользователи — все три списочные страницы постранично листаются
+  src/test/              тесты на Vitest + React Testing Library, общий setup (jest-dom, очистка DOM между тестами)
 ```
 
 ## Быстрый старт
@@ -206,6 +208,8 @@ python -c "import secrets; print(secrets.token_urlsafe(32))"
 
 ## Тестирование
 
+### Backend
+
 ```bash
 pytest
 ```
@@ -215,7 +219,16 @@ pytest
 - **Unit-уровень** (`tests/`) — сервисы, роуты, презентеры, middleware и сервисный слой бота, проверяются прямым вызовом функций с замоканными зависимостями. Быстро, и точно указывает, какой именно юнит сломался.
 - **Интеграционные** (`tests/integration/`) — настоящие HTTP-запросы через реальное FastAPI-приложение (`httpx`/`TestClient`) в изолированную SQLite-базу в памяти, создаваемую заново для каждого теста. Покрывают полный цикл логин → рефреш (ротация + детект повторного использования) → логаут, контроль доступа к защищённым роутам, проверку сервисного токена и форму пагинированных ответов — то, что ломается только на уровне связки компонентов, а не внутри отдельной функции.
 
-Оба набора автоматически прогоняются в GitHub Actions на каждый push и pull request вместе с `ruff check`/`ruff format --check` — конфигурация в `.github/workflows/ci.yml`.
+### Веб-панель
+
+```bash
+cd admin-panel
+npm run test
+```
+
+25 тестов на Vitest + React Testing Library, проверяющих поведение, видимое пользователю, а не детали реализации: `LoginPage` (валидный/невалидный логин), хук `useApiFetch` (тихое обновление access-токена при 401 и повтор запроса), `ProtectedRoute` (редирект без токена), `ErrorBoundary` (запасной экран при падении дочернего компонента) и все три списочные страницы — рендер таблицы, переключение статусов/блокировки, создание и удаление с обработкой ошибок, пагинация. `fetch` в тестах подменяется вручную — тесты не ходят ни в реальный backend, ни в сеть.
+
+Оба набора — backend и веб-панель — автоматически прогоняются в GitHub Actions на каждый push и pull request двумя параллельными job'ами: `ruff check`/`ruff format --check`/`pytest` и `oxlint`/`vitest`/сборка — конфигурация в `.github/workflows/ci.yml`.
 
 ## Расширение и масштабирование
 
