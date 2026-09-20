@@ -1,4 +1,5 @@
 from collections.abc import Awaitable, Callable
+from functools import partial
 
 from aiogram import F, Router
 from aiogram.filters import Command
@@ -24,6 +25,14 @@ RenderAfterUpdate = Callable[
     [CallbackQuery, ApiClient, RequestData | None],
     Awaitable[None],
 ]
+
+AdjacentRequestGetter = Callable[
+    [ApiClient, int, int, int],
+    Awaitable[tuple[bool, str | None, RequestData | None]],
+]
+
+_new_request_adjacent = partial(get_adjacent_request, status_to_find=StatusEnum.NEW.value)
+_in_progress_adjacent = partial(get_adjacent_request, status_to_find=StatusEnum.IN_PROGRESS.value)
 
 
 async def _send_first_admin_request(
@@ -122,6 +131,32 @@ async def _update_request_status_from_callback(
 
     await callback.answer(status_text)
     await render_after(callback, api_client, request_data)
+
+
+async def _navigate_request(
+    callback: CallbackQuery,
+    api_client: ApiClient,
+    direction: int,
+    adjacent_getter: AdjacentRequestGetter,
+    keyboard_factory: Callable[[RequestData], object],
+) -> None:
+    request_id = int(callback.data.split(":", maxsplit=1)[1])
+    is_success, error_text, request_data = await adjacent_getter(
+        api_client,
+        callback.from_user.id,
+        request_id,
+        direction,
+    )
+
+    if not is_success:
+        await callback.answer(error_text, show_alert=True)
+        return
+
+    await callback.answer()
+    await callback.message.edit_text(
+        format_request_text(request_data),
+        reply_markup=keyboard_factory(request_data),
+    )
 
 
 async def _render_first_new_request(
@@ -363,135 +398,67 @@ async def handle_view_request(callback: CallbackQuery, api_client: ApiClient):
 
 @router.callback_query(F.data.startswith("next_new_request:"))
 async def handle_next_new_request(callback: CallbackQuery, api_client: ApiClient):
-    request_id = int(callback.data.split(":", maxsplit=1)[1])
-    is_success, error_text, new_request = await get_adjacent_request(
+    await _navigate_request(
+        callback,
         api_client,
-        callback.from_user.id,
-        request_id,
         direction=1,
-        status_to_find=StatusEnum.NEW.value,
-    )
-    if not is_success:
-        await callback.answer(error_text, show_alert=True)
-        return
-    if new_request is None:
-        await callback.answer(error_text, show_alert=True)
-        return
-    await callback.answer()
-    await callback.message.edit_text(
-        format_request_text(new_request),
-        reply_markup=kb.admin_new_request_keyboard(new_request.id),
-    )
-
-
-@router.callback_query(F.data.startswith("next_today_request:"))
-async def handle_next_today_request(callback: CallbackQuery, api_client: ApiClient):
-    request_id = int(callback.data.split(":", maxsplit=1)[1])
-    is_success, error_text, today_request = await get_adjacent_today_request(
-        api_client,
-        callback.from_user.id,
-        request_id,
-        direction=1,
-    )
-
-    if not is_success:
-        await callback.answer(error_text, show_alert=True)
-        return
-
-    await callback.answer()
-    await callback.message.edit_text(
-        format_request_text(today_request),
-        reply_markup=get_today_request_keyboard(today_request),
-    )
-
-
-@router.callback_query(F.data.startswith("previous_today_request:"))
-async def handle_previous_today_request(callback: CallbackQuery, api_client: ApiClient):
-    request_id = int(callback.data.split(":", maxsplit=1)[1])
-    is_success, error_text, today_request = await get_adjacent_today_request(
-        api_client,
-        callback.from_user.id,
-        request_id,
-        direction=-1,
-    )
-
-    if not is_success:
-        await callback.answer(error_text, show_alert=True)
-        return
-
-    await callback.answer()
-    await callback.message.edit_text(
-        format_request_text(today_request),
-        reply_markup=get_today_request_keyboard(today_request),
-    )
-
-
-@router.callback_query(F.data.startswith("next_in_progress:"))
-async def handle_next_in_progress_request(callback: CallbackQuery, api_client: ApiClient):
-    request_id = int(callback.data.split(":", maxsplit=1)[1])
-    is_success, error_text, new_request = await get_adjacent_request(
-        api_client,
-        callback.from_user.id,
-        request_id,
-        direction=1,
-        status_to_find=StatusEnum.IN_PROGRESS.value,
-    )
-    if not is_success:
-        await callback.answer(error_text, show_alert=True)
-        return
-    if new_request is None:
-        await callback.answer(error_text, show_alert=True)
-        return
-    await callback.answer()
-    await callback.message.edit_text(
-        format_request_text(new_request),
-        reply_markup=kb.admin_in_progress_request_keyboard(new_request.id),
-    )
-
-
-@router.callback_query(F.data.startswith("previous_in_progress:"))
-async def handle_previous_in_progress_request(callback: CallbackQuery, api_client: ApiClient):
-    request_id = int(callback.data.split(":", maxsplit=1)[1])
-    is_success, error_text, new_request = await get_adjacent_request(
-        api_client,
-        callback.from_user.id,
-        request_id,
-        direction=-1,
-        status_to_find=StatusEnum.IN_PROGRESS.value,
-    )
-    if not is_success:
-        await callback.answer(error_text, show_alert=True)
-        return
-    if new_request is None:
-        await callback.answer(error_text, show_alert=True)
-        return
-    await callback.answer()
-    await callback.message.edit_text(
-        format_request_text(new_request),
-        reply_markup=kb.admin_in_progress_request_keyboard(new_request.id),
+        adjacent_getter=_new_request_adjacent,
+        keyboard_factory=lambda request: kb.admin_new_request_keyboard(request.id),
     )
 
 
 @router.callback_query(F.data.startswith("previous_new_request:"))
 async def handle_previous_new_request(callback: CallbackQuery, api_client: ApiClient):
-    request_id = int(callback.data.split(":", maxsplit=1)[1])
-    is_success, error_text, new_request = await get_adjacent_request(
+    await _navigate_request(
+        callback,
         api_client,
-        callback.from_user.id,
-        request_id,
         direction=-1,
-        status_to_find=StatusEnum.NEW.value,
+        adjacent_getter=_new_request_adjacent,
+        keyboard_factory=lambda request: kb.admin_new_request_keyboard(request.id),
     )
-    if not is_success:
-        await callback.answer(error_text, show_alert=True)
-        return
-    if new_request is None:
-        await callback.answer(error_text, show_alert=True)
-        return
-    await callback.answer()
-    await callback.message.edit_text(
-        format_request_text(new_request),
-        reply_markup=kb.admin_new_request_keyboard(new_request.id),
+
+
+@router.callback_query(F.data.startswith("next_in_progress:"))
+async def handle_next_in_progress_request(callback: CallbackQuery, api_client: ApiClient):
+    await _navigate_request(
+        callback,
+        api_client,
+        direction=1,
+        adjacent_getter=_in_progress_adjacent,
+        keyboard_factory=lambda request: kb.admin_in_progress_request_keyboard(request.id),
+    )
+
+
+@router.callback_query(F.data.startswith("previous_in_progress:"))
+async def handle_previous_in_progress_request(callback: CallbackQuery, api_client: ApiClient):
+    await _navigate_request(
+        callback,
+        api_client,
+        direction=-1,
+        adjacent_getter=_in_progress_adjacent,
+        keyboard_factory=lambda request: kb.admin_in_progress_request_keyboard(request.id),
+    )
+
+
+@router.callback_query(F.data.startswith("next_today_request:"))
+async def handle_next_today_request(callback: CallbackQuery, api_client: ApiClient):
+    await _navigate_request(
+        callback,
+        api_client,
+        direction=1,
+        adjacent_getter=get_adjacent_today_request,
+        keyboard_factory=get_today_request_keyboard,
+    )
+
+
+@router.callback_query(F.data.startswith("previous_today_request:"))
+async def handle_previous_today_request(callback: CallbackQuery, api_client: ApiClient):
+    await _navigate_request(
+        callback,
+        api_client,
+        direction=-1,
+        adjacent_getter=get_adjacent_today_request,
+        keyboard_factory=get_today_request_keyboard,
     )
 
 
@@ -563,16 +530,4 @@ async def handle_complete_today_request(callback: CallbackQuery, api_client: Api
         callback,
         api_client,
         StatusEnum.COMPLETED.value,
-    )
-
-
-@router.callback_query(F.data.startswith("reject_today_in_progress_request:"))
-async def handle_reject_today_in_progress_request(
-    callback: CallbackQuery,
-    api_client: ApiClient,
-):
-    await update_today_request_status_from_callback(
-        callback,
-        api_client,
-        StatusEnum.REJECTED.value,
     )

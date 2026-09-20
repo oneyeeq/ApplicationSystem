@@ -171,7 +171,7 @@ def admin_today_in_progress_request_keyboard(
             ),
             InlineKeyboardButton(
                 text="Отклонить",
-                callback_data=f"reject_today_in_progress_request:{request_id}",
+                callback_data=f"reject_today_request:{request_id}",
             ),
         ],
         [

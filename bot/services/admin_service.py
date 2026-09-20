@@ -55,23 +55,23 @@ async def get_today_requests(
     return True, None, today_requests
 
 
-async def get_active_admins(api_client: ApiClient) -> tuple[list[AdminData] | None, str]:
+async def get_active_admins(api_client: ApiClient) -> tuple[bool, str | None, list[AdminData]]:
     admins, status = await api_client.get_active_admins()
     if status == "ok":
-        return admins, "ok"
+        return True, None, admins or []
     if status == "not_found":
-        return None, "Не найдено"
-    return None, "Ошибка сервера"
+        return False, "Не найдено", []
+    return False, "Ошибка сервера", []
 
 
 async def is_active_admin(
     api_client: ApiClient,
     telegram_id: int,
 ) -> tuple[bool, str | None]:
-    admins, status = await get_active_admins(api_client)
-    if status != "ok":
+    is_success, error_text, admins = await get_active_admins(api_client)
+    if not is_success:
         return False, "Сервис временно недоступен"
-    if not any(admin.tg_admin_id == telegram_id for admin in (admins or [])):
+    if not any(admin.tg_admin_id == telegram_id for admin in admins):
         return False, "Доступ запрещён"
     return True, None
 
@@ -179,7 +179,7 @@ async def get_first_new_request(
 async def get_first_in_progress_request(
     api_client: ApiClient,
     telegram_id: int,
-) -> tuple[bool, str | None, dict | None]:
+) -> tuple[bool, str | None, RequestData | None]:
     return await _get_first_request(
         api_client,
         telegram_id,
