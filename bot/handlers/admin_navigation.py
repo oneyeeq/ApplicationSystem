@@ -1,5 +1,5 @@
-from bot.clients.api_client import ApiClient
 import bot.services.admin_service as admin_service
+from bot.clients.api_client import ApiClient
 from bot.services.admin_service import RequestListGetter
 
 
@@ -41,9 +41,7 @@ async def get_adjacent_request(
     async def _by_status(client: ApiClient, tid: int):
         return await admin_service.get_requests_by_status(client, tid, status_to_find)
 
-    return await _get_adjacent_request(
-        api_client, telegram_id, request_id, direction, _by_status
-    )
+    return await _get_adjacent_request(api_client, telegram_id, request_id, direction, _by_status)
 
 
 async def get_adjacent_today_request(

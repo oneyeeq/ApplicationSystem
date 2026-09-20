@@ -10,8 +10,10 @@ from sqlalchemy.ext.asyncio import (
     create_async_engine,
 )
 
+from app import (
+    models as _models,  # noqa: F401 -- registers all models on Base.metadata before create_all
+)
 from app.database import Base
-from app import models as _models
 
 
 @pytest_asyncio.fixture

@@ -16,9 +16,7 @@ async def verify_service_token_or_admin(
     """Пропускает либо бота (X-Service-Token), либо залогиненного админа
     (Authorization: Bearer <JWT>). Нужна там, где один и тот же ресурс
     (заявки, пользователи) должны видеть и менять и бот, и веб-панель."""
-    if x_service_token is not None and hmac.compare_digest(
-        x_service_token, settings.SERVICE_TOKEN
-    ):
+    if x_service_token is not None and hmac.compare_digest(x_service_token, settings.SERVICE_TOKEN):
         return
 
     if authorization is not None and authorization.startswith("Bearer "):

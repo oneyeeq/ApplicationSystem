@@ -1,7 +1,7 @@
 from collections.abc import AsyncIterator
-from fastapi.testclient import TestClient
 
 import pytest_asyncio
+from fastapi.testclient import TestClient
 from sqlalchemy import event
 from sqlalchemy.ext.asyncio import (
     AsyncSession,
@@ -36,6 +36,7 @@ async def client() -> AsyncIterator[AsyncSession]:
         class_=AsyncSession,
         expire_on_commit=False,
     )
+
     async def override_get_db():
         async with session_factory() as session:
             yield session
@@ -47,4 +48,3 @@ async def client() -> AsyncIterator[AsyncSession]:
 
     app.dependency_overrides.clear()
     await engine.dispose()
-

@@ -1,25 +1,25 @@
-from fastapi import Request, Response, Cookie
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Cookie, Depends, HTTPException, Request, Response
 from sqlalchemy.ext.asyncio import AsyncSession
 
-
-from app.schemas.auth_schemas import LoginRequest, LoginResponse
-from app.services.auth_service import (authenticate_admin,
-                                       refresh_access_token,
-                                       revoke_refresh_token,
-                                       )
 from app.database import get_db
 from app.rate_limiter import limiter
-from config import settings
-from app.services.exceptions import (
-    AdminNotFoundError,
-    AdminIsNotActiveError,
-    PasswordNotValidError,
-    RefreshTokenInvalidError,
-    RefreshTokenExpiredError,
+from app.schemas.auth_schemas import LoginRequest, LoginResponse
+from app.services.auth_service import (
+    authenticate_admin,
+    refresh_access_token,
+    revoke_refresh_token,
 )
+from app.services.exceptions import (
+    AdminIsNotActiveError,
+    AdminNotFoundError,
+    PasswordNotValidError,
+    RefreshTokenExpiredError,
+    RefreshTokenInvalidError,
+)
+from config import settings
 
 router = APIRouter()
+
 
 @router.post("/auth/login/", response_model=LoginResponse)
 @limiter.limit("5/minute")
@@ -30,10 +30,7 @@ async def auth_login(
     db: AsyncSession = Depends(get_db),
 ):
     try:
-        login_response, raw_refresh_token = await authenticate_admin(
-            request_data,
-            db
-        )
+        login_response, raw_refresh_token = await authenticate_admin(request_data, db)
         response.set_cookie(
             key="refresh_token",
             value=raw_refresh_token,
@@ -48,6 +45,7 @@ async def auth_login(
         raise HTTPException(status_code=401, detail="Неверный логин или пароль")
     except PasswordNotValidError:
         raise HTTPException(status_code=401, detail="Неверный логин или пароль")
+
 
 @router.post("/auth/refresh/", response_model=LoginResponse)
 async def auth_refresh(
@@ -71,6 +69,7 @@ async def auth_refresh(
         raise HTTPException(status_code=401, detail="Неправильный токен")
     except RefreshTokenExpiredError:
         raise HTTPException(status_code=401, detail="Токен истек")
+
 
 @router.post("/auth/logout/")
 async def auth_logout(

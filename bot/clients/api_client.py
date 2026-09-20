@@ -4,7 +4,6 @@ from typing import Any, TypeVar
 
 import aiohttp
 
-from config import settings
 from bot.dtos import (
     AdminData,
     CanCreateRequestData,
@@ -12,6 +11,7 @@ from bot.dtos import (
     RequestData,
     UserData,
 )
+from config import settings
 
 API_URL = settings.API_URL
 
@@ -22,11 +22,13 @@ def _handle_api_errors(
     func: Callable[..., Awaitable[tuple[T | None, str]]],
 ) -> Callable[..., Awaitable[tuple[T | None, str]]]:
     """Декоратор для единообразной обработки ошибок HTTP-запросов."""
+
     async def wrapper(*args: Any, **kwargs: Any) -> tuple[T | None, str]:
         try:
             return await func(*args, **kwargs)
         except (asyncio.TimeoutError, aiohttp.ClientError):
             return None, "unavailable"  # type: ignore[return-value]
+
     return wrapper
 
 
@@ -96,11 +98,7 @@ class ApiClient:
         result, status = await self._request(
             "POST",
             f"{API_URL}/requests/{telegram_id}",
-            json=(
-                data.model_dump()
-                if isinstance(data, RequestCreateData)
-                else dict(data)
-            ),
+            json=(data.model_dump() if isinstance(data, RequestCreateData) else dict(data)),
         )
         if status == "ok":
             return RequestData.model_validate(result) if result is not None else None, "ok"
@@ -112,9 +110,7 @@ class ApiClient:
     async def get_active_admins(self) -> tuple[list[AdminData] | None, str]:
         result, status = await self._request("GET", f"{API_URL}/admins/active")
         return (
-            [AdminData.model_validate(item) for item in result]
-            if result is not None
-            else None
+            [AdminData.model_validate(item) for item in result] if result is not None else None
         ), status
 
     async def get_request(self, request_id: int) -> tuple[RequestData | None, str]:
@@ -131,16 +127,12 @@ class ApiClient:
             f"{API_URL}/requests/{request_id}",
             json={"status": status},
         )
-        return (
-            RequestData.model_validate(result) if result is not None else None
-        ), response_status
+        return (RequestData.model_validate(result) if result is not None else None), response_status
 
     async def get_requests(self) -> tuple[list[RequestData] | None, str]:
         result, status = await self._request("GET", f"{API_URL}/requests/")
         return (
-            [RequestData.model_validate(item) for item in result]
-            if result is not None
-            else None
+            [RequestData.model_validate(item) for item in result] if result is not None else None
         ), status
 
     async def get_user_requests(
@@ -152,7 +144,5 @@ class ApiClient:
             f"{API_URL}/requests/by-telegram/{telegram_id}",
         )
         return (
-            [RequestData.model_validate(item) for item in result]
-            if result is not None
-            else None
+            [RequestData.model_validate(item) for item in result] if result is not None else None
         ), status

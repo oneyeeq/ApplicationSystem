@@ -62,12 +62,14 @@ async def test_delete_user_blocked_when_user_has_requests(db_session):
     user = User(tg_user_id=2004, username="with_requests")
     db_session.add(user)
     await db_session.flush()
-    db_session.add(Request(
-        service_name="Сайт",
-        phone_number="+10000000003",
-        user_id=user.id,
-        status=StatusEnum.NEW,
-    ))
+    db_session.add(
+        Request(
+            service_name="Сайт",
+            phone_number="+10000000003",
+            user_id=user.id,
+            status=StatusEnum.NEW,
+        )
+    )
     await db_session.commit()
 
     with pytest.raises(UserHasRequestsError):

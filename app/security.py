@@ -2,10 +2,12 @@ import base64
 import hashlib
 import hmac
 import secrets
-
 from datetime import datetime, timedelta, timezone
-from jose import jwt, JWTError
+
+from jose import JWTError, jwt
+
 from config import settings
+
 
 def hash_password(password: str) -> str:
     salt = secrets.token_bytes(16)
@@ -16,7 +18,12 @@ def hash_password(password: str) -> str:
         r=8,
         p=1,
     )
-    return "scrypt$" + base64.urlsafe_b64encode(salt).decode() + "$" + base64.urlsafe_b64encode(digest).decode()
+    return (
+        "scrypt$"
+        + base64.urlsafe_b64encode(salt).decode()
+        + "$"
+        + base64.urlsafe_b64encode(digest).decode()
+    )
 
 
 def verify_password(password: str, encoded_hash: str | None) -> bool:
@@ -40,10 +47,9 @@ def verify_password(password: str, encoded_hash: str | None) -> bool:
     )
     return hmac.compare_digest(actual_digest, expected_digest)
 
+
 def create_access_token(subject: str) -> str:
-    expire = datetime.now(timezone.utc) + timedelta(
-        minutes=settings.JWT_EXPIRE_MINUTES
-    )
+    expire = datetime.now(timezone.utc) + timedelta(minutes=settings.JWT_EXPIRE_MINUTES)
     payload = {
         "sub": subject,
         "exp": expire,
@@ -71,8 +77,10 @@ def decode_access_token(token: str) -> str:
 
     return subject
 
+
 def generate_refresh_token() -> str:
     return secrets.token_urlsafe(32)
+
 
 def hash_refresh_token(raw_token: str) -> str:
     return hashlib.sha256(raw_token.encode()).hexdigest()

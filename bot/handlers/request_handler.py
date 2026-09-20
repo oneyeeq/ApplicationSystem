@@ -273,7 +273,9 @@ async def handle_submit_request(
         return
 
     await state.clear()
-    await show_main_menu(callback.message, api_client, telegram_id, status_text or "Заявка отправлена.")
+    await show_main_menu(
+        callback.message, api_client, telegram_id, status_text or "Заявка отправлена."
+    )
 
 
 @router.callback_query(F.data == "back_to_menu")

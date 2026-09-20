@@ -1,9 +1,9 @@
+import fcntl
 import os
+from pathlib import Path
 
 import aiohttp
-import fcntl
 from aiogram import Bot, Dispatcher
-from pathlib import Path
 
 from bot.clients.api_client import ApiClient
 from bot.handlers.admin_handler import router as admin_router
@@ -32,14 +32,13 @@ def acquire_instance_lock():
         lock_file.seek(0)
         owner_pid = lock_file.read().strip() or "неизвестен"
         lock_file.close()
-        raise RuntimeError(
-            f"Бот уже запущен в другом процессе (PID: {owner_pid})"
-        ) from error
+        raise RuntimeError(f"Бот уже запущен в другом процессе (PID: {owner_pid})") from error
     lock_file.seek(0)
     lock_file.truncate()
     lock_file.write(str(os.getpid()))
     lock_file.flush()
     return lock_file
+
 
 async def main():
     lock_file = acquire_instance_lock()
@@ -49,13 +48,14 @@ async def main():
             timeout=timeout,
             headers={"X-Service-Token": settings.SERVICE_TOKEN},
         ) as session:
-
             api_client = ApiClient(session)
             dp["api_client"] = api_client
             await dp.start_polling(bot)
     finally:
         lock_file.close()
 
+
 if __name__ == "__main__":
     import asyncio
+
     asyncio.run(main())

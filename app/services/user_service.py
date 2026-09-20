@@ -49,6 +49,7 @@ async def update_user(db: AsyncSession, user_id: int, user_data: UserUpdate) -> 
     await db.refresh(user)
     return user
 
+
 async def delete_user(db: AsyncSession, user_id: int) -> None:
     user = await get_user_by_id(db, user_id)
     await db.delete(user)

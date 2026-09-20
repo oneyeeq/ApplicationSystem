@@ -2,33 +2,34 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database import get_db
+from app.dependencies.auth import get_current_admin
+from app.dependencies.service_auth import verify_service_token
+from app.models.admin_model import Admin
 from app.schemas.admin_schemas import (
     AdminCreate,
     AdminNotificationResponse,
     AdminResponse,
     AdminUpdate,
 )
-from app.models.admin_model import Admin
+from app.services import admin_service
 from app.services.exceptions import (
     AdminAlreadyExistsError,
     AdminNotFoundError,
     AdminSelfDeleteError,
 )
-from app.services import admin_service
-from app.dependencies.auth import get_current_admin
-from app.dependencies.service_auth import verify_service_token
 
 router = APIRouter()
 
+
 @router.get("/admins/active", response_model=list[AdminNotificationResponse])
 async def get_active_admins(
-    db: AsyncSession = Depends(get_db),
-    _: None = Depends(verify_service_token)
-    ):
+    db: AsyncSession = Depends(get_db), _: None = Depends(verify_service_token)
+):
     try:
         return await admin_service.get_active_admins(db)
     except AdminNotFoundError:
         raise HTTPException(status_code=404, detail="Активные админы не найдены")
+
 
 @router.post("/admins/", response_model=AdminResponse)
 async def create_admin(
@@ -41,12 +42,14 @@ async def create_admin(
     except AdminAlreadyExistsError:
         raise HTTPException(status_code=409, detail="Админ уже существует")
 
+
 @router.get("/admins/", response_model=list[AdminResponse])
 async def list_admins(
     db: AsyncSession = Depends(get_db),
     admin: Admin = Depends(get_current_admin),
 ):
     return await admin_service.get_admins(db)
+
 
 @router.put("/admins/{admin_id}", response_model=AdminResponse)
 async def update_admin(
@@ -61,6 +64,7 @@ async def update_admin(
         raise HTTPException(status_code=404, detail="Админ не найден")
     except AdminAlreadyExistsError:
         raise HTTPException(status_code=409, detail="Админ с таким tg_admin_id уже существует")
+
 
 @router.delete("/admins/{admin_id}")
 async def delete_admin(

@@ -1,8 +1,9 @@
 from unittest.mock import AsyncMock
+
 from aiogram.types import CallbackQuery, Message
 
-from bot.middlewares.admin_auth import AdminAuthMiddleware
 import bot.middlewares.admin_auth as admin_auth_module
+from bot.middlewares.admin_auth import AdminAuthMiddleware
 
 
 async def test_middleware_rejects_non_admin_callback(monkeypatch):
@@ -24,6 +25,7 @@ async def test_middleware_rejects_non_admin_callback(monkeypatch):
     assert handler.called is False
     event.answer.assert_awaited_once_with("Доступ запрещён", show_alert=True)
 
+
 async def test_middleware_rejects_non_admin_message(monkeypatch):
     monkeypatch.setattr(
         admin_auth_module,
@@ -42,6 +44,7 @@ async def test_middleware_rejects_non_admin_message(monkeypatch):
 
     assert handler.called is False
     event.answer.assert_awaited_once_with("Доступ запрещён")
+
 
 async def test_middleware_accepts_is_admin(monkeypatch):
     monkeypatch.setattr(

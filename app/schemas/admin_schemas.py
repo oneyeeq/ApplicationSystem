@@ -6,7 +6,6 @@ class AdminCreate(BaseModel):
     password: str = Field(min_length=8, max_length=128)
     tg_admin_id: int | None = None
     username: str | None = None
-   
 
 
 class AdminResponse(BaseModel):
@@ -23,6 +22,7 @@ class AdminUpdate(BaseModel):
     is_active: bool | None = None
     tg_admin_id: int | None = None
     username: str | None = None
+
 
 class AdminNotificationResponse(BaseModel):
     tg_admin_id: int | None

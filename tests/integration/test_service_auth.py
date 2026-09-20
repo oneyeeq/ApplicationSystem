@@ -1,6 +1,6 @@
-from config import settings
 from app.schemas.admin_schemas import AdminCreate
 from app.services import admin_service
+from config import settings
 
 
 async def test_get_active_admins_with_valid_service_token(client):

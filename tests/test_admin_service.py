@@ -26,12 +26,8 @@ async def test_admin_service_creates_and_lists_active_admin(db_session):
 
 
 async def test_admin_service_rejects_duplicate_admin(db_session):
-    db_session.add(Admin(
-        login="admin1",
-        password_hash="secure-pass-1",
-        tg_admin_id=5002,
-        username="duplicate"
-        )
+    db_session.add(
+        Admin(login="admin1", password_hash="secure-pass-1", tg_admin_id=5002, username="duplicate")
     )
     await db_session.commit()
 

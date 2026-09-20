@@ -2,20 +2,20 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database import get_db
+from app.dependencies.service_or_admin_auth import verify_service_token_or_admin
 from app.schemas.request_schemas import RequestCreate, RequestResponse, RequestUpdate
 from app.services import request_service
-from app.dependencies.service_or_admin_auth import verify_service_token_or_admin
-from app.services.notification_service import (
-    notify_admins_about_request,
-    notify_user_about_status,
-)
 from app.services.exceptions import (
     ActiveRequestLimitError,
     InactiveUserError,
-    RequestNotFoundError,
-    UserNotFoundError,
     RequestAlreadyClosedError,
+    RequestNotFoundError,
     RequestTransitionNotAllowedError,
+    UserNotFoundError,
+)
+from app.services.notification_service import (
+    notify_admins_about_request,
+    notify_user_about_status,
 )
 
 router = APIRouter(dependencies=[Depends(verify_service_token_or_admin)])
@@ -24,7 +24,7 @@ router = APIRouter(dependencies=[Depends(verify_service_token_or_admin)])
 @router.post("/requests/{telegram_id}", response_model=RequestResponse)
 async def create_request(
     telegram_id: int, request_data: RequestCreate, db: AsyncSession = Depends(get_db)
-):  
+):
     try:
         request = await request_service.create_request(db, telegram_id, request_data)
         await notify_admins_about_request(request.id)

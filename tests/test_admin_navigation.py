@@ -1,7 +1,7 @@
 from unittest.mock import AsyncMock
 
-from bot.handlers import admin_navigation
 from bot.dtos import RequestData
+from bot.handlers import admin_navigation
 
 
 def make_request(request_id: int) -> RequestData:

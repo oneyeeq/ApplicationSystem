@@ -1,5 +1,9 @@
-from aiogram.types import InlineKeyboardButton, InlineKeyboardMarkup
-from aiogram.types import KeyboardButton, ReplyKeyboardMarkup
+from aiogram.types import (
+    InlineKeyboardButton,
+    InlineKeyboardMarkup,
+    KeyboardButton,
+    ReplyKeyboardMarkup,
+)
 
 START_KEYBOARD = InlineKeyboardMarkup(
     inline_keyboard=[
@@ -20,7 +24,7 @@ START_KEYBOARD = InlineKeyboardMarkup(
                 text="Помощь",
                 callback_data="help",
             ),
-        ]
+        ],
     ]
 )
 

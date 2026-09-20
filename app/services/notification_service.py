@@ -5,9 +5,9 @@ from aiogram.exceptions import AiogramError
 from aiogram.types import InlineKeyboardButton, InlineKeyboardMarkup
 from sqlalchemy.exc import SQLAlchemyError
 
-from app.services import admin_service
-from app.models.user_model import User
 from app.database import session_factory
+from app.models.user_model import User
+from app.services import admin_service
 from app.services.exceptions import AdminNotFoundError
 from config import settings
 from enums import StatusEnum

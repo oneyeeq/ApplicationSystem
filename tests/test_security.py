@@ -43,6 +43,7 @@ def test_access_token_rejects_modified_token():
 
 def test_access_token_requires_subject():
     from jose import jwt
+
     from config import settings
 
     token = jwt.encode(

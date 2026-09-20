@@ -4,11 +4,10 @@ from aiogram import F, Router
 from aiogram.filters import Command
 from aiogram.types import CallbackQuery, Message
 
-from enums import StatusEnum
-from bot.clients.api_client import ApiClient
-from bot.dtos import RequestData
 import bot.keyboards.admin_keyboards as kb
 import bot.services.admin_service as admin_service
+from bot.clients.api_client import ApiClient
+from bot.dtos import RequestData
 from bot.handlers.admin_navigation import (
     get_adjacent_request,
     get_adjacent_today_request,
@@ -17,6 +16,7 @@ from bot.handlers.admin_presenter import (
     format_request_text,
     get_today_request_keyboard,
 )
+from enums import StatusEnum
 
 router = Router()
 
@@ -70,6 +70,7 @@ async def _edit_to_first_new_request(
         reply_markup=kb.admin_new_request_keyboard(next_request.id),
     )
     return True
+
 
 async def _edit_to_first_in_progress_request(
     callback: CallbackQuery,
@@ -186,9 +187,7 @@ async def update_notification_request_status_from_callback(
     api_client: ApiClient,
     new_status: str,
 ) -> None:
-    await _update_request_status_from_callback(
-        callback, api_client, new_status, _render_admin_menu
-    )
+    await _update_request_status_from_callback(callback, api_client, new_status, _render_admin_menu)
 
 
 async def update_today_request_status_from_callback(
@@ -199,6 +198,7 @@ async def update_today_request_status_from_callback(
     await _update_request_status_from_callback(
         callback, api_client, new_status, _render_today_request
     )
+
 
 @router.callback_query(F.data == "admin_back_to_menu")
 async def handle_back_to_admin_menu(callback: CallbackQuery):
@@ -230,6 +230,7 @@ async def handle_new_request(callback: CallbackQuery, api_client: ApiClient):
         reply_markup=kb.admin_new_request_keyboard(request_data.id),
     )
 
+
 @router.callback_query(F.data == "in_progress")
 async def handle_in_progress_request(callback: CallbackQuery, api_client: ApiClient):
     is_success, error_text, request_data = await admin_service.get_first_in_progress_request(
@@ -250,6 +251,7 @@ async def handle_in_progress_request(callback: CallbackQuery, api_client: ApiCli
         format_request_text(request_data),
         reply_markup=kb.admin_in_progress_request_keyboard(request_data.id),
     )
+
 
 @router.callback_query(F.data == "today")
 async def handle_today_request(callback: CallbackQuery, api_client: ApiClient):
@@ -332,6 +334,7 @@ async def handle_today_command(message: Message, api_client: ApiClient):
         reply_markup=get_today_request_keyboard(request_data),
     )
 
+
 @router.callback_query(F.data.startswith("view_request:"))
 async def handle_view_request(callback: CallbackQuery, api_client: ApiClient):
     request_id = int(callback.data.split(":", maxsplit=1)[1])
@@ -356,6 +359,7 @@ async def handle_view_request(callback: CallbackQuery, api_client: ApiClient):
         format_request_text(request_data),
         reply_markup=reply_markup,
     )
+
 
 @router.callback_query(F.data.startswith("next_new_request:"))
 async def handle_next_new_request(callback: CallbackQuery, api_client: ApiClient):
@@ -420,6 +424,8 @@ async def handle_previous_today_request(callback: CallbackQuery, api_client: Api
         format_request_text(today_request),
         reply_markup=get_today_request_keyboard(today_request),
     )
+
+
 @router.callback_query(F.data.startswith("next_in_progress:"))
 async def handle_next_in_progress_request(callback: CallbackQuery, api_client: ApiClient):
     request_id = int(callback.data.split(":", maxsplit=1)[1])
@@ -441,6 +447,7 @@ async def handle_next_in_progress_request(callback: CallbackQuery, api_client: A
         format_request_text(new_request),
         reply_markup=kb.admin_in_progress_request_keyboard(new_request.id),
     )
+
 
 @router.callback_query(F.data.startswith("previous_in_progress:"))
 async def handle_previous_in_progress_request(callback: CallbackQuery, api_client: ApiClient):
@@ -464,6 +471,7 @@ async def handle_previous_in_progress_request(callback: CallbackQuery, api_clien
         reply_markup=kb.admin_in_progress_request_keyboard(new_request.id),
     )
 
+
 @router.callback_query(F.data.startswith("previous_new_request:"))
 async def handle_previous_new_request(callback: CallbackQuery, api_client: ApiClient):
     request_id = int(callback.data.split(":", maxsplit=1)[1])
@@ -486,17 +494,27 @@ async def handle_previous_new_request(callback: CallbackQuery, api_client: ApiCl
         reply_markup=kb.admin_new_request_keyboard(new_request.id),
     )
 
+
 @router.callback_query(F.data.startswith("take_request:"))
 async def handle_take_request(callback: CallbackQuery, api_client: ApiClient):
-    await update_new_request_status_from_callback(callback, api_client, StatusEnum.IN_PROGRESS.value)
+    await update_new_request_status_from_callback(
+        callback, api_client, StatusEnum.IN_PROGRESS.value
+    )
+
 
 @router.callback_query(F.data.startswith("complete_request:"))
 async def handle_complete_request(callback: CallbackQuery, api_client: ApiClient):
-    await update_in_progress_request_status_from_callback(callback, api_client, StatusEnum.COMPLETED.value)
+    await update_in_progress_request_status_from_callback(
+        callback, api_client, StatusEnum.COMPLETED.value
+    )
+
 
 @router.callback_query(F.data.startswith("reject_in_progress_request:"))
 async def handle_reject_in_progress_request(callback: CallbackQuery, api_client: ApiClient):
-    await update_in_progress_request_status_from_callback(callback, api_client, StatusEnum.REJECTED.value)
+    await update_in_progress_request_status_from_callback(
+        callback, api_client, StatusEnum.REJECTED.value
+    )
+
 
 @router.callback_query(F.data.startswith("reject_new_request:"))
 async def handle_reject_new_request(callback: CallbackQuery, api_client: ApiClient):

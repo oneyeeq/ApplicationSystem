@@ -1,13 +1,12 @@
-from datetime import datetime, timedelta
-from zoneinfo import ZoneInfo
-from config import settings
-from datetime import timezone as datetime_timezone
-
 from collections.abc import Awaitable, Callable
+from datetime import datetime, timedelta
+from datetime import timezone as datetime_timezone
+from zoneinfo import ZoneInfo
 
-from enums import StatusEnum
 from bot.clients.api_client import ApiClient
 from bot.dtos import AdminData, RequestData
+from config import settings
+from enums import StatusEnum
 
 RequestListGetter = Callable[
     [ApiClient, int],
@@ -15,6 +14,7 @@ RequestListGetter = Callable[
 ]
 
 timezone = ZoneInfo(settings.TIMEZONE)
+
 
 def get_today_range() -> tuple[datetime, datetime]:
     current_time = datetime.now(timezone)
@@ -27,9 +27,9 @@ def get_today_range() -> tuple[datetime, datetime]:
     tomorrow_start = today_start + timedelta(days=1)
     return today_start, tomorrow_start
 
+
 async def get_today_requests(
-        api_client: ApiClient,
-        telegram_id: int
+    api_client: ApiClient, telegram_id: int
 ) -> tuple[bool, str | None, list[RequestData]]:
     requests, status = await api_client.get_requests()
     if status != "ok":
@@ -47,9 +47,13 @@ async def get_today_requests(
             updated_datetime = updated_datetime.replace(tzinfo=datetime_timezone.utc)
         created_datetime = created_datetime.astimezone(timezone)
         updated_datetime = updated_datetime.astimezone(timezone)
-        if today_start <= created_datetime < tomorrow_start or today_start <= updated_datetime < tomorrow_start:
+        if (
+            today_start <= created_datetime < tomorrow_start
+            or today_start <= updated_datetime < tomorrow_start
+        ):
             today_requests.append(request)
     return True, None, today_requests
+
 
 async def get_active_admins(api_client: ApiClient) -> tuple[list[AdminData] | None, str]:
     admins, status = await api_client.get_active_admins()
@@ -120,8 +124,7 @@ async def get_requests_by_status(
         return False, "Сервис временно недоступен", []
 
     filtered_requests = [
-        request for request in (requests or [])
-        if request.status == status_to_find
+        request for request in (requests or []) if request.status == status_to_find
     ]
 
     return True, None, filtered_requests
@@ -132,6 +135,7 @@ async def get_new_requests(
     telegram_id: int,
 ) -> tuple[bool, str | None, list[RequestData]]:
     return await get_requests_by_status(api_client, telegram_id, StatusEnum.NEW.value)
+
 
 async def get_in_progress_requests(
     api_client: ApiClient,
@@ -159,6 +163,7 @@ async def _get_first_request(
 
     return True, None, requests[0]
 
+
 async def get_first_new_request(
     api_client: ApiClient,
     telegram_id: int,
@@ -170,6 +175,7 @@ async def get_first_new_request(
         "Новых заявок нет",
     )
 
+
 async def get_first_in_progress_request(
     api_client: ApiClient,
     telegram_id: int,
@@ -180,4 +186,3 @@ async def get_first_in_progress_request(
         get_in_progress_requests,
         "Заявок в работе нет",
     )
-    

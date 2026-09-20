@@ -1,12 +1,12 @@
 from fastapi import Depends, HTTPException, status
-from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
-from sqlalchemy.ext.asyncio import AsyncSession
+from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database import get_db
-from app.security import decode_access_token
 from app.models.admin_model import Admin
-from app.services.exceptions import AdminNotFoundError, AdminIsNotActiveError
+from app.security import decode_access_token
+from app.services.exceptions import AdminIsNotActiveError, AdminNotFoundError
 
 bearer_scheme = HTTPBearer()
 
@@ -42,6 +42,6 @@ async def get_admin_from_token(token: str, db: AsyncSession) -> Admin:
 
 async def get_current_admin(
     credentials: HTTPAuthorizationCredentials = Depends(bearer_scheme),
-    db: AsyncSession = Depends(get_db)
+    db: AsyncSession = Depends(get_db),
 ) -> Admin:
     return await get_admin_from_token(credentials.credentials, db)

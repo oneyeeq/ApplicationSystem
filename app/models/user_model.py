@@ -1,6 +1,7 @@
-from sqlalchemy import BigInteger, Boolean, Integer, String, DateTime, func
-from sqlalchemy.orm import Mapped, mapped_column
 from datetime import datetime
+
+from sqlalchemy import BigInteger, Boolean, DateTime, Integer, String, func
+from sqlalchemy.orm import Mapped, mapped_column
 
 from app.database import Base
 
@@ -15,8 +16,5 @@ class User(Base):
     active_requests: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=func.now())
     updated_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True),
-        default=func.now(),
-        onupdate=func.now()
+        DateTime(timezone=True), default=func.now(), onupdate=func.now()
     )
-

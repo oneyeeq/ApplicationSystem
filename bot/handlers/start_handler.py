@@ -2,11 +2,11 @@ from aiogram import F, Router, types
 from aiogram.filters import Command, CommandStart
 from aiogram.types import Message, ReplyKeyboardRemove
 
-from bot.clients.api_client import ApiClient
 import bot.keyboards.admin_keyboards as admin_kb
 import bot.keyboards.request_keyboard as req_kb
 import bot.services.admin_service as admin_service
 import bot.services.start_service as start_service
+from bot.clients.api_client import ApiClient
 
 router = Router()
 
@@ -91,4 +91,3 @@ async def handle_help_callback(callback: types.CallbackQuery, api_client: ApiCli
         _get_admin_help_text() if is_admin else _get_user_help_text(),
         reply_markup=req_kb.BACK_TO_MENU_KEYBOARD,
     )
-                         

@@ -1,5 +1,6 @@
 from aiogram.types import InlineKeyboardButton, InlineKeyboardMarkup
 
+
 def request_keyboard(request_id: int) -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup(
         inline_keyboard=[
@@ -157,6 +158,7 @@ def admin_in_progress_request_keyboard(
         inline_keyboard=keyboard,
     )
 
+
 def admin_today_in_progress_request_keyboard(
     request_id: int,
     include_back_to_menu: bool = True,
@@ -165,7 +167,7 @@ def admin_today_in_progress_request_keyboard(
         [
             InlineKeyboardButton(
                 text="Завершить",
-                    callback_data=f"complete_today_request:{request_id}",
+                callback_data=f"complete_today_request:{request_id}",
             ),
             InlineKeyboardButton(
                 text="Отклонить",
@@ -175,11 +177,11 @@ def admin_today_in_progress_request_keyboard(
         [
             InlineKeyboardButton(
                 text="Предыдущая",
-                    callback_data=f"previous_today_request:{request_id}",
+                callback_data=f"previous_today_request:{request_id}",
             ),
             InlineKeyboardButton(
                 text="Следующая",
-                    callback_data=f"next_today_request:{request_id}",
+                callback_data=f"next_today_request:{request_id}",
             ),
         ],
     ]

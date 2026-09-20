@@ -1,8 +1,8 @@
 from aiogram.types import InlineKeyboardMarkup
 
-from enums import StatusEnum
 import bot.keyboards.admin_keyboards as keyboards
 from bot.dtos import RequestData
+from enums import StatusEnum
 
 
 def format_request_text(request_data: RequestData) -> str:

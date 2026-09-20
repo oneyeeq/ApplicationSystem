@@ -1,8 +1,10 @@
-from sqlalchemy import Integer, String, ForeignKey, DateTime, func
-from sqlalchemy.orm import Mapped, mapped_column
 from datetime import datetime
 
+from sqlalchemy import DateTime, ForeignKey, Integer, String, func
+from sqlalchemy.orm import Mapped, mapped_column
+
 from app.database import Base
+
 
 class RefreshToken(Base):
     __tablename__ = "refresh_token"

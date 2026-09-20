@@ -1,8 +1,8 @@
+from bot.dtos import RequestData
 from bot.handlers.admin_presenter import (
     format_request_text,
     get_today_request_keyboard,
 )
-from bot.dtos import RequestData
 from bot.presenters.user_requests import format_user_requests
 
 
@@ -19,9 +19,7 @@ def make_request(request_id: int, status: str, service_name: str = "Сайт") -
 
 
 def test_admin_presenter_formats_request():
-    result = format_request_text(
-        make_request(1, "новая")
-    )
+    result = format_request_text(make_request(1, "новая"))
 
     assert "Заявка №1" in result
     assert "Услуга: Сайт" in result

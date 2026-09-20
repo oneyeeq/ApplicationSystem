@@ -7,11 +7,7 @@ from app.database import Base
 class Admin(Base):
     __tablename__ = "admin"
 
-    id: Mapped[int] = mapped_column(
-        Integer,
-        primary_key=True,
-        autoincrement=True
-    )
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
     login: Mapped[str] = mapped_column(
         String(50),
         unique=True,
@@ -30,7 +26,4 @@ class Admin(Base):
         String(255),
         nullable=True,
     )
-    is_active: Mapped[bool] = mapped_column(
-        Boolean,
-        default=True
-    )
+    is_active: Mapped[bool] = mapped_column(Boolean, default=True)
