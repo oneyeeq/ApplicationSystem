@@ -2,11 +2,11 @@
 
 # Request Service
 
-A production-style service-request platform: a Telegram bot for customers and admins, a FastAPI backend, and a scheduler for housekeeping — all running behind a real authentication layer, not a demo stub.
+[![CI](https://github.com/oneyeeq/ApplicationSystem/actions/workflows/ci.yml/badge.svg)](https://github.com/oneyeeq/ApplicationSystem/actions/workflows/ci.yml)
+
+A service-request platform: a Telegram bot for customers and admins, a FastAPI backend, a background archiving scheduler, and a React web admin panel — four independent processes talking to each other through a real authentication layer, not a demo stub.
 
 Customers submit service requests through a Telegram bot. Admins review, accept, complete, or reject them — either through the same bot or through a React web admin panel. The backend is the single source of truth for both.
-
-Built as a portfolio project, but engineered like it has to survive contact with real users: JWT access/refresh tokens with rotation and theft detection, a separate service-to-service auth model for the bot, async SQLAlchemy + Alembic migrations, a layered bot architecture, and a test suite that includes real HTTP-level integration tests, not just mocked unit tests.
 
 ## Contents
 
@@ -19,7 +19,6 @@ Built as a portfolio project, but engineered like it has to survive contact with
 - [API](#api)
 - [Testing](#testing)
 - [Extending & scaling](#extending--scaling)
-- [Roadmap](#roadmap)
 - [License](#license)
 
 ## Architecture
@@ -37,7 +36,7 @@ Built as a portfolio project, but engineered like it has to survive contact with
                            │
                     ┌──────▼──────┐      ┌──────────────┐
                     │  PostgreSQL │◀─────│  Scheduler   │
-                    │             │      │ (cleanup job)│
+                    │             │      │ (archiving)  │
                     └─────────────┘      └──────────────┘
 ```
 
@@ -45,24 +44,30 @@ Four independent processes, one database, no shared in-memory state — any of t
 
 - **`app/`** — FastAPI backend. Owns all business logic and all writes to the database. Routes are intentionally thin (HTTP mapping + exception-to-status-code translation only); everything else lives in `services/`.
 - **`bot/`** — aiogram 3 Telegram bot. Talks to the backend exclusively over HTTP, through a typed client (`bot/clients/api_client.py`) — it has no direct database access and no SQLAlchemy dependency.
-- **`scheduler/`** — a standalone async loop that periodically deletes closed requests past their retention window. Talks to the database directly (no need to go through the API for a housekeeping job with no external caller).
+- **`scheduler/`** — a standalone async loop that periodically moves stale requests (older than 30 days by default, regardless of status) into a separate archive table instead of deleting them outright. Talks to the database directly (no need to go through the API for a housekeeping job with no external caller).
 - **`migrations/`** — Alembic migration history, one revision per schema change, all verified reversible.
 
 ## Key engineering decisions
 
 These are the parts worth a second look if you're evaluating the code, not just skimming the folder names.
 
-**Two separate auth models, not one stretched to fit.** A human admin logging into the (future) web panel gets a JWT access token plus a refresh token — because that's a session that needs to survive browser restarts and be revocable. The bot is a trusted service, not a person with a password, so it authenticates with a static shared secret (`X-Service-Token`, checked via `hmac.compare_digest` for timing-attack resistance) instead of pretending it's a user. See `app/dependencies/auth.py` vs `app/dependencies/service_auth.py`.
+**Two separate auth models, not one stretched to fit.** A human admin logging into the web panel gets a JWT access token plus a refresh token — because that's a session that needs to survive browser restarts and be revocable. The bot is a trusted service, not a person with a password, so it authenticates with a static shared secret (`X-Service-Token`, checked via `hmac.compare_digest` for timing-attack resistance) instead of pretending it's a user. See `app/dependencies/auth.py` vs `app/dependencies/service_auth.py`.
 
 **Refresh tokens are opaque and hashed at rest, with rotation and reuse detection.** The token stored in the database is a SHA-256 hash of a random 256-bit value — never the token itself, so a database leak alone doesn't leak live sessions. Every refresh both invalidates the old token and issues a new one; if an already-used (and therefore already-revoked) token is presented again, that's treated as a signal of theft and *every* refresh token for that admin is revoked at once. See `app/services/auth_service.py::refresh_access_token`.
 
 **Passwords use `scrypt`, refresh tokens use `sha256` — deliberately different.** A password is short and human-chosen, so it needs a slow, memory-hard hash to resist brute-forcing. A refresh token is a random 256-bit value with no brute-forceable structure; hashing it slowly would only cost CPU for no security benefit. Using the same primitive for both would be the "looks careful, isn't" version of this problem.
 
+**Login is rate-limited against password guessing.** `POST /auth/login/` is capped at 5 attempts per minute per IP (`slowapi`, `app/rate_limiter.py`) — without it, nothing would stop unlimited password-guessing attempts against an admin account.
+
 **The bot has almost no business logic of its own.** `bot/services/` only translates backend responses into bot-shaped `(success, message, data)` tuples and Russian-language user messages. Every actual rule (can this user submit another request, is this status transition allowed) lives once, in the backend, and both the bot and any future client see the same behavior automatically.
 
-**The web panel keeps the access token in memory only; the refresh token lives only in the backend's httpOnly cookie.** On startup the panel silently restores the session via `POST /auth/refresh/` (the cookie goes along automatically; JS can't even read it). Any request that comes back 401 (the access token lives only 30 minutes) goes through a shared interceptor, `useApiFetch`, which refreshes the token and retries the request once before giving up and logging out. `localStorage` is deliberately never used for the token — that's the whole point, since it closes off session theft via XSS. See `admin-panel/src/api/useApiFetch.ts`.
+**The web panel keeps the access token in memory only; the refresh token lives only in the backend's httpOnly cookie.** On startup the panel silently restores the session via `POST /auth/refresh/` (the cookie goes along automatically; JS can't even read it). Any request that comes back 401 (the access token lives only 30 minutes) goes through a shared interceptor, `useApiFetch`, which refreshes the token and retries the request once before giving up and logging out. `localStorage` is deliberately never used for the token — that's the whole point, since it closes off session theft via XSS. The `Secure` flag on the refresh-token cookie is driven by the `COOKIE_SECURE` env var (`False` for local HTTP development, `True` in production behind HTTPS). See `admin-panel/src/api/useApiFetch.ts`.
 
-**Tests are split by what they actually exercise.** `tests/*.py` calls service and route functions directly — fast, but blind to anything that only breaks through FastAPI's real routing, dependency injection, or Pydantic serialization. `tests/integration/*.py` sends real HTTP requests through the actual ASGI app (`httpx`/`TestClient`) against an isolated in-memory SQLite database per test. Both layers exist because they catch different classes of bugs — several real ones (an unwired `Depends`, a route path typo, a response-schema mismatch the client silently choked on) were only ever caught by the second kind, in this project's own history.
+**Archived requests are a separate table with no foreign key, not an `is_archived` flag.** `ArchivedRequest` doesn't reference `user`: the live `request` table's foreign key to the user is deliberately `ondelete=RESTRICT`, so a user can't be deleted while they still have request history attached — but an archived row needs to survive both the user and the original request being gone. The scheduler moves every request older than `REQUEST_STALE_DAYS` into the archive regardless of status — a forgotten open request goes stale exactly the same way a closed one does.
+
+**Pagination is a sibling endpoint, not a reshaped response on the existing one.** `GET /requests/` has a second consumer besides the web panel: the bot (`bot/clients/api_client.py`) pulls the full list and filters it client-side by status and date to find the "first new request" or "today's requests." Silently switching that endpoint to a paginated response would have cut the bot off from data past the first page. So every list resource gets a parallel `GET /<resource>/paginated?page=&page_size=`, returning `{items, total, page, page_size}` through a shared generic schema, `PaginatedResponse[T]` (`app/schemas/pagination.py`), while the original unconditional list stays exactly as it was.
+
+**Tests are split by what they actually exercise.** `tests/*.py` calls service and route functions directly — fast, but blind to anything that only breaks through FastAPI's real routing, dependency injection, or Pydantic serialization. `tests/integration/*.py` sends real HTTP requests through the actual ASGI app (`httpx`/`TestClient`) against an isolated in-memory SQLite database per test. Both layers exist because they catch different classes of bugs — several real ones (an unwired `Depends`, a route path typo, a response-schema mismatch the client silently choked on) were only ever caught by the second kind, in this project's own history. Both suites run automatically on every push and pull request in GitHub Actions, alongside `ruff` (`.github/workflows/ci.yml`).
 
 ## Tech stack
 
@@ -75,6 +80,8 @@ These are the parts worth a second look if you're evaluating the code, not just 
 | Auth | JWT (`python-jose`), `scrypt` password hashing, HMAC service tokens |
 | Validation | Pydantic v2 |
 | Testing | pytest, pytest-asyncio, httpx |
+| Lint / format | ruff |
+| CI | GitHub Actions — ruff + pytest on every push and PR |
 | Runtime | Python 3.12, Docker / Docker Compose |
 | Web panel | React 19 + TypeScript, Vite, React Router, CSS Modules |
 
@@ -85,7 +92,7 @@ app/                  FastAPI backend
   routes/              thin HTTP layer — request/response mapping only
   services/            business logic, one module per domain (auth, admin, user, request, notification)
   models/              SQLAlchemy models
-  schemas/             Pydantic request/response schemas
+  schemas/             Pydantic request/response schemas (incl. the shared pagination.py)
   dependencies/         auth.py (JWT), service_auth.py (bot service token)
   security.py          password hashing, JWT encode/decode
   database.py          engine, session factory
@@ -97,7 +104,7 @@ bot/                  aiogram Telegram bot
   middlewares/         admin-auth middleware (checks admin status once per update)
   keyboards/, presenters/, dtos.py
 
-scheduler/            background cleanup job
+scheduler/            background job that archives stale requests
 migrations/            Alembic revisions
 requirements/          split per service (base/api/bot/scheduler/dev) — each Docker image installs only what it needs
 docker/                one Dockerfile per service
@@ -109,7 +116,7 @@ admin-panel/           React + TypeScript web panel (SPA, Vite)
   src/api/               401 interceptor with automatic access-token refresh
   src/auth/              auth context, route protection
   src/components/        shared shell (sidebar, tables, ErrorBoundary)
-  src/pages/             Login, Requests, Admins, Users
+  src/pages/             Login, Requests, Admins, Users — all three list pages are paginated
 ```
 
 ## Quickstart
@@ -168,9 +175,10 @@ All settings are read from environment variables (`config.py`, via `pydantic-set
 | `JWT_SECRET_KEY`, `JWT_ALGORITHM`, `JWT_EXPIRE_MINUTES` | Access token signing |
 | `REFRESH_TOKEN_EXPIRE_DAYS` | Refresh token lifetime |
 | `SERVICE_TOKEN` | Shared secret the bot presents to the API (`X-Service-Token` header) |
-| `CORS_ALLOWED_ORIGINS` | JSON list of origins allowed to call the API with credentials (for the future web panel) |
+| `COOKIE_SECURE` | `Secure` flag on the refresh-token cookie — `True` only behind HTTPS, `False` for local HTTP development |
+| `CORS_ALLOWED_ORIGINS` | JSON list of origins allowed to call the API with credentials (the web panel) |
 | `MAX_ACTIVE_REQUESTS` | How many open requests one user can have at once |
-| `REQUEST_STALE_DAYS`, `CLEANUP_INTERVAL_SECONDS` | Scheduler behavior |
+| `REQUEST_STALE_DAYS`, `CLEANUP_INTERVAL_SECONDS` | Archiving scheduler behavior |
 
 Generate secrets with:
 ```bash
@@ -194,16 +202,20 @@ At a glance:
 | `GET/POST/PUT/DELETE /users/*` | service token **or** JWT | User records — usable by both the bot and the web panel (deletion blocked if the user has requests) |
 | `GET /health/` | — | Liveness + real database connectivity check |
 
+Each of the three list resources (`requests`, `users`, `admins`) also has a `GET /<resource>/paginated?page=&page_size=` sibling — same auth as the rest of that resource, response shaped as `{items, total, page, page_size}` (defaults `page=1`, `page_size=10`, capped at `page_size=100`). The web panel uses it for its tables; the bot keeps pulling the full, unpaginated list wherever it needs to.
+
 ## Testing
 
 ```bash
 pytest
 ```
 
-83 tests, two kinds:
+98 tests, two kinds:
 
 - **Unit-style** (`tests/`) — service, route, presenter, middleware, and bot-service logic, tested by calling functions directly with mocked dependencies. Fast, and precise about which unit is broken when one fails.
-- **Integration** (`tests/integration/`) — real HTTP requests through the actual FastAPI app (`httpx`/`TestClient`) against an isolated in-memory SQLite database created fresh per test. Covers the full login → refresh (rotation + reuse-detection) → logout flow, protected-route access control, and service-token enforcement — the things that only break at the wiring level, not inside any single function.
+- **Integration** (`tests/integration/`) — real HTTP requests through the actual FastAPI app (`httpx`/`TestClient`) against an isolated in-memory SQLite database created fresh per test. Covers the full login → refresh (rotation + reuse-detection) → logout flow, protected-route access control, service-token enforcement, and the shape of paginated responses — the things that only break at the wiring level, not inside any single function.
+
+Both suites run automatically on every push and pull request in GitHub Actions, alongside `ruff check`/`ruff format --check` — see `.github/workflows/ci.yml`.
 
 ## Extending & scaling
 
@@ -216,13 +228,6 @@ pytest
 **Swapping infrastructure**: Postgres, the JWT secret, and the service token are all just environment variables — pointing `DATABASE_URL` at a managed database (RDS, Cloud SQL, etc.) instead of the bundled container requires no code changes.
 
 **Adding a new page to the panel**: a page under `admin-panel/src/pages/` that uses `useApiFetch()` for requests (the interceptor adds `Authorization` and handles token expiry on its own) and `useAuth()` for the current session. Register the route in `App.tsx` inside `ProtectedRoute`, add a link in the `Layout.tsx` sidebar. Neither auth nor 401 handling needs reinventing — that's already shared infrastructure.
-
-## Roadmap
-
-- [ ] Rate limiting on `POST /auth/login/` — nothing currently stops unlimited password-guessing attempts
-- [ ] `secure=True` on the refresh-token cookie once deployed behind HTTPS (currently just `httponly`+`samesite=lax`, which is correct for local HTTP development)
-- [ ] Pagination on list endpoints (not yet needed at current data volume)
-- [ ] Archiving closed requests instead of hard-deleting them — a separate archive table so `user`/`request` can be cleaned up without losing history (not yet designed)
 
 ## License
 
