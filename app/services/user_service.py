@@ -4,15 +4,15 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.user_model import User
 from app.schemas.user_schemas import UserCreate, UserUpdate
-from app.services.exceptions import UserHasRequestsError, UserNotFoundError
-from app.services.request_service import has_reached_active_limit
+from app.services.exceptions import UserAlreadyExistsError, UserHasRequestsError, UserNotFoundError
+from config import settings
 
 
 async def get_user_by_telegram_id(db: AsyncSession, telegram_id: int) -> User:
     result = await db.execute(select(User).where(User.tg_user_id == telegram_id))
     user = result.scalar_one_or_none()
     if user is None:
-        raise UserNotFoundError
+        raise UserNotFoundError("Пользователь не найден")
     return user
 
 
@@ -20,7 +20,7 @@ async def get_user_by_id(db: AsyncSession, user_id: int) -> User:
     result = await db.execute(select(User).where(User.id == user_id))
     user = result.scalar_one_or_none()
     if user is None:
-        raise UserNotFoundError
+        raise UserNotFoundError("Пользователь не найден")
     return user
 
 
@@ -36,7 +36,7 @@ async def create_user(db: AsyncSession, user_data: UserCreate) -> User:
         await db.commit()
     except IntegrityError:
         await db.rollback()
-        raise
+        raise UserAlreadyExistsError("Пользователь с таким Telegram ID уже существует")
     await db.refresh(user)
     return user
 
@@ -61,10 +61,7 @@ async def delete_user(db: AsyncSession, user_id: int) -> None:
 
 
 async def can_create_request(db: AsyncSession, telegram_id: int) -> dict:
-    result = await db.execute(select(User).where(User.tg_user_id == telegram_id))
-    user = result.scalar_one_or_none()
-    if user is None:
-        raise UserNotFoundError
+    user = await get_user_by_telegram_id(db, telegram_id)
 
     if not user.is_active:
         return {"allowed": False, "error": "inactive"}
@@ -73,3 +70,7 @@ async def can_create_request(db: AsyncSession, telegram_id: int) -> dict:
         return {"allowed": False, "error": "limit"}
 
     return {"allowed": True, "error": None}
+
+
+def has_reached_active_limit(user: User) -> bool:
+    return user.active_requests >= settings.MAX_ACTIVE_REQUESTS

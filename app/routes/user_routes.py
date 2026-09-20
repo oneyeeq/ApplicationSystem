@@ -1,14 +1,13 @@
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException
-from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database import get_db
 from app.dependencies.service_or_admin_auth import verify_service_token_or_admin
 from app.schemas.user_schemas import UserCreate, UserResponse, UserUpdate
 from app.services import user_service
-from app.services.exceptions import UserHasRequestsError, UserNotFoundError
+from app.services.exceptions import UserAlreadyExistsError, UserHasRequestsError, UserNotFoundError
 
 router = APIRouter(dependencies=[Depends(verify_service_token_or_admin)])
 DbSession = Annotated[AsyncSession, Depends(get_db)]
@@ -39,7 +38,7 @@ async def get_user(user_id: int, db: DbSession):
 async def create_user(user_data: UserCreate, db: DbSession):
     try:
         return await user_service.create_user(db, user_data)
-    except IntegrityError:
+    except UserAlreadyExistsError:
         raise HTTPException(
             status_code=409,
             detail="Пользователь с таким Telegram ID уже существует",

@@ -25,10 +25,7 @@ router = APIRouter()
 async def get_active_admins(
     db: AsyncSession = Depends(get_db), _: None = Depends(verify_service_token)
 ):
-    try:
-        return await admin_service.get_active_admins(db)
-    except AdminNotFoundError:
-        raise HTTPException(status_code=404, detail="Активные админы не найдены")
+    return await admin_service.get_active_admins(db)
 
 
 @router.post("/admins/", response_model=AdminResponse)

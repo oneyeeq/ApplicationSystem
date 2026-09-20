@@ -52,3 +52,7 @@ class AdminSelfDeleteError(Exception):
 
 class UserHasRequestsError(Exception):
     pass
+
+
+class UserAlreadyExistsError(Exception):
+    pass

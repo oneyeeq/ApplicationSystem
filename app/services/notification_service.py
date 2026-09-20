@@ -8,7 +8,6 @@ from sqlalchemy.exc import SQLAlchemyError
 from app.database import session_factory
 from app.models.user_model import User
 from app.services import admin_service
-from app.services.exceptions import AdminNotFoundError
 from config import settings
 from enums import StatusEnum
 
@@ -79,8 +78,6 @@ async def _get_active_admins():
     async with session_factory() as db:
         try:
             return await admin_service.get_active_admins(db)
-        except AdminNotFoundError:
-            return []
         except SQLAlchemyError:
             logger.exception("Не удалось получить список активных администраторов")
             return []

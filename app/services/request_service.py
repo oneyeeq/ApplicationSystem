@@ -13,8 +13,8 @@ from app.services.exceptions import (
     RequestAlreadyClosedError,
     RequestNotFoundError,
     RequestTransitionNotAllowedError,
-    UserNotFoundError,
 )
+from app.services.user_service import get_user_by_id, get_user_by_telegram_id
 from config import settings
 
 ACTIVE_STATUSES = {
@@ -38,7 +38,7 @@ async def create_request(
     telegram_id: int,
     request_data: RequestCreate,
 ) -> Request:
-    user = await _get_user_by_telegram_id(db, telegram_id)
+    user = await get_user_by_telegram_id(db, telegram_id)
     _validate_user_active(user)
 
     reserved = await db.execute(
@@ -65,7 +65,7 @@ async def list_user_requests(
     db: AsyncSession,
     telegram_id: int,
 ) -> list[Request]:
-    user = await _get_user_by_telegram_id(db, telegram_id)
+    user = await get_user_by_telegram_id(db, telegram_id)
     result = await db.execute(
         select(Request)
         .where(Request.user_id == user.id)
@@ -95,11 +95,8 @@ async def update_request(
         raise RequestTransitionNotAllowedError("Заявка не может быть изменена")
     request.status = request_data.status
     if _is_status_transition(old_status, request.status, ACTIVE_STATUSES, CLOSED_STATUSES):
-        user = await _get_user_by_id(db, request.user_id)
+        user = await get_user_by_id(db, request.user_id)
         _adjust_active_requests(user, delta=-1)
-    elif _is_status_transition(old_status, request.status, CLOSED_STATUSES, ACTIVE_STATUSES):
-        user = await _get_user_by_id(db, request.user_id)
-        _adjust_active_requests(user, delta=+1)
 
     await db.commit()
     await db.refresh(request)
@@ -109,7 +106,7 @@ async def update_request(
 async def delete_request(db: AsyncSession, request_id: int) -> None:
     request = await get_request(db, request_id)
     if request.status in ACTIVE_STATUSES:
-        user = await _get_user_by_id(db, request.user_id)
+        user = await get_user_by_id(db, request.user_id)
         _adjust_active_requests(user, delta=-1)
     await db.delete(request)
     await db.commit()
@@ -143,28 +140,9 @@ async def archive_stale_requests(
 # -- Helpers --
 
 
-async def _get_user_by_telegram_id(db: AsyncSession, telegram_id: int) -> User:
-    result = await db.execute(select(User).where(User.tg_user_id == telegram_id))
-    user = result.scalar_one_or_none()
-    if user is None:
-        raise UserNotFoundError("Пользователь не найден")
-    return user
-
-
-async def _get_user_by_id(db: AsyncSession, user_id: int) -> User:
-    user = await db.get(User, user_id)
-    if user is None:
-        raise UserNotFoundError("Пользователь не найден")
-    return user
-
-
 def _validate_user_active(user: User) -> None:
     if not user.is_active:
         raise InactiveUserError("Пользователь заблокирован")
-
-
-def has_reached_active_limit(user: User) -> bool:
-    return user.active_requests >= settings.MAX_ACTIVE_REQUESTS
 
 
 def _is_status_transition(

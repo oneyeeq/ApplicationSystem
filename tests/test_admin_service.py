@@ -44,8 +44,7 @@ async def test_admin_service_rejects_duplicate_admin(db_session):
 
 
 async def test_admin_service_reports_no_active_admins(db_session):
-    with pytest.raises(AdminNotFoundError):
-        await admin_service.get_active_admins(db_session)
+    assert await admin_service.get_active_admins(db_session) == []
 
 
 async def test_admin_service_updates_telegram_link_and_active_status(db_session):

@@ -41,14 +41,13 @@ async def test_request_route_translates_limit_error(monkeypatch):
     assert error.value.status_code == 409
 
 
-async def test_admin_route_translates_missing_admins(monkeypatch):
+async def test_admin_route_returns_empty_list_when_no_active_admins(monkeypatch):
     monkeypatch.setattr(
         admin_routes.admin_service,
         "get_active_admins",
-        AsyncMock(side_effect=admin_routes.AdminNotFoundError()),
+        AsyncMock(return_value=[]),
     )
 
-    with pytest.raises(HTTPException) as error:
-        await admin_routes.get_active_admins(AsyncMock())
+    result = await admin_routes.get_active_admins(AsyncMock())
 
-    assert error.value.status_code == 404
+    assert result == []
