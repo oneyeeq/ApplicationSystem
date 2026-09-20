@@ -1,15 +1,18 @@
 from datetime import datetime, timedelta
 
+import pytest
 from sqlalchemy import select
 
 from app.models.request_model import Request, StatusEnum
 from app.models.user_model import User
 from app.schemas.request_schemas import RequestCreate, RequestUpdate
+from app.services.exceptions import ActiveRequestLimitError
 from app.services.request_service import (
     create_request,
     delete_expired_closed_requests,
     update_request,
 )
+from config import settings
 
 
 async def test_cleanup_deletes_old_completed_and_rejected_requests(db_session):
@@ -111,3 +114,26 @@ async def test_request_lifecycle_updates_user_active_count(db_session):
     )
 
     assert user.active_requests == 0
+
+
+async def test_create_request_rejects_when_limit_reached(db_session):
+    user = User(tg_user_id=1004, active_requests=settings.MAX_ACTIVE_REQUESTS)
+    db_session.add(user)
+    await db_session.commit()
+
+    with pytest.raises(ActiveRequestLimitError):
+        await create_request(
+            db_session,
+            telegram_id=user.tg_user_id,
+            request_data=RequestCreate(
+                service_name="Сайт",
+                phone_number="+10000000005",
+            ),
+        )
+
+    # the guarded UPDATE must not have created an orphan Request row
+    # when it correctly matched 0 rows
+    result = await db_session.execute(
+        select(Request).where(Request.user_id == user.id)
+    )
+    assert result.scalars().all() == []

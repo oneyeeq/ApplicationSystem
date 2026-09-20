@@ -1,6 +1,6 @@
 from datetime import datetime
 
-from sqlalchemy import delete, select
+from sqlalchemy import delete, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.request_model import Request, StatusEnum
@@ -38,11 +38,17 @@ async def create_request(
 ) -> Request:
     user = await _get_user_by_telegram_id(db, telegram_id)
     _validate_user_active(user)
-    _validate_active_request_limit(user)
+
+    reserved = await db.execute(
+        update(User)
+        .where(User.id == user.id, User.active_requests < settings.MAX_ACTIVE_REQUESTS)
+        .values(active_requests=User.active_requests + 1)
+    )
+    if reserved.rowcount == 0:
+        raise ActiveRequestLimitError("Достигнут лимит активных заявок")
 
     request = Request(**request_data.model_dump(), user_id=user.id)
     db.add(request)
-    user.active_requests += 1
     await db.commit()
     await db.refresh(request)
     return request
@@ -146,10 +152,6 @@ def _validate_user_active(user: User) -> None:
 
 def has_reached_active_limit(user: User) -> bool:
     return user.active_requests >= settings.MAX_ACTIVE_REQUESTS
-
-def _validate_active_request_limit(user: User) -> None:
-    if has_reached_active_limit(user):
-        raise ActiveRequestLimitError("Достигнут лимит активных заявок")
 
 def _is_status_transition(
     old: StatusEnum,
