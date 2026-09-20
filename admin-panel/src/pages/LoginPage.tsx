@@ -32,14 +32,17 @@ function LoginPage() {
             <div className={styles.card}>
                 <h1>Вход</h1>
                 <div className={styles.field}>
-                    <label>Логин</label>
+                    <label htmlFor="login">Логин</label>
                     <input
+                        id="login"
                         value={login} onChange={(e) => setLogin(e.target.value)}
                     />
                 </div>
+
                 <div className={styles.field}>
-                    <label>Пароль</label>
+                    <label htmlFor="password">Пароль</label>
                     <input
+                        id="password"
                         value={password} type="password" onChange={(e) => setPassword(e.target.value)}
                     />
                 </div>
