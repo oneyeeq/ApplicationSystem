@@ -1,0 +1,33 @@
+name: CI
+
+on:
+  push:
+    branches: [master]
+  pull_request:
+    branches: [master]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: "pip"
+          cache-dependency-path: requirements/dev.txt
+
+      - name: Install dependencies
+        run: pip install -r requirements/dev.txt
+
+      - name: Copy env template
+        run: cp .env.example .env
+
+      - name: Lint with ruff
+        run: |
+          ruff check app/ bot/ scheduler/ tests/ config.py
+          ruff format --check app/ bot/ scheduler/ tests/ config.py
+
+      - name: Run tests
+        run: pytest -q
