@@ -8,8 +8,15 @@ A service-request platform: a Telegram bot for customers and admins, a FastAPI b
 
 Customers submit service requests through a Telegram bot. Admins review, accept, complete, or reject them — either through the same bot or through a React web admin panel. The backend is the single source of truth for both.
 
+## Demo
+
+![Submitting a request through the Telegram bot and handling it in the admin panel](assets/demo-bot-admin-panel.gif)
+
+A customer submits a request through the Telegram bot — it shows up immediately in the admin web panel, where it gets accepted and completed.
+
 ## Contents
 
+- [Demo](#demo)
 - [Architecture](#architecture)
 - [Key engineering decisions](#key-engineering-decisions)
 - [Tech stack](#tech-stack)
@@ -219,6 +226,8 @@ pytest
 - **Unit-style** (`tests/`) — service, route, presenter, middleware, and bot-service logic, tested by calling functions directly with mocked dependencies. Fast, and precise about which unit is broken when one fails.
 - **Integration** (`tests/integration/`) — real HTTP requests through the actual FastAPI app (`httpx`/`TestClient`) against an isolated in-memory SQLite database created fresh per test. Covers the full login → refresh (rotation + reuse-detection) → logout flow, protected-route access control, service-token enforcement, and the shape of paginated responses — the things that only break at the wiring level, not inside any single function.
 
+![pytest run](assets/demo-pytest.gif)
+
 ### Web panel
 
 ```bash
@@ -227,6 +236,8 @@ npm run test
 ```
 
 25 tests on Vitest + React Testing Library, checking user-visible behavior rather than implementation details: `LoginPage` (valid/invalid login), the `useApiFetch` hook (silent access-token refresh on a 401 and one retry), `ProtectedRoute` (redirect without a token), `ErrorBoundary` (fallback screen when a child component throws), and all three list pages — table rendering, status/active toggles, create and delete with error handling, pagination. `fetch` is stubbed by hand in every test — nothing here talks to a real backend or the network.
+
+![vitest run](assets/demo-frontend-tests.gif)
 
 Both suites — backend and web panel — run automatically on every push and pull request in GitHub Actions, as two parallel jobs: `ruff check`/`ruff format --check`/`pytest` and `oxlint`/`vitest`/build — see `.github/workflows/ci.yml`.
 
